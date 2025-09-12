@@ -1,10 +1,13 @@
 import { MadeWithDyad } from "@/components/made-with-dyad";
+import { Navbar } from "@/components/Navbar";
+import { Hero1 } from "@/components/Hero1";
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-1 items-center sm:items-start">
-        <h1>Blank page</h1>
+    <div className="flex flex-col min-h-screen font-[family-name:var(--font-geist-sans)]">
+      <Navbar />
+      <main className="flex-1 flex flex-col items-center justify-center">
+        <Hero1 />
       </main>
       <MadeWithDyad />
     </div>

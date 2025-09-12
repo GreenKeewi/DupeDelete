@@ -19,10 +19,10 @@ export const Hero1 = () => (
           </p>
         </div>
         <div className="flex flex-row gap-3">
-          <Button size="lg" className="gap-4" variant="outline">
+          <Button size="lg" variant="default" className="gap-4"> {/* Changed to default variant to use primary color */}
             Clean up to 100 files free
           </Button>
-          <Button size="lg" className="gap-4">
+          <Button size="lg" className="gap-4 bg-accent text-accent-foreground hover:bg-accent/90"> {/* Applied accent color directly */}
             Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
           </Button>
         </div>

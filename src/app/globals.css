@@ -98,32 +98,38 @@
   }
 
   :root[data-theme="dark"] {
-    --background: hsl(240, 10%, 8%); /* Deep charcoal with a hint of blue */
-    --foreground: hsl(240, 20%, 95%); /* Off-white */
-    --primary: hsl(250, 70%, 65%);   /* Vibrant medium purple */
-    --secondary: hsl(240, 15%, 15%); /* Darker, desaturated blue-gray for subtle elements */
-    --accent: hsl(250, 70%, 65%);    /* Same as primary for consistency */
+    --text: hsl(245, 40%, 94%);
+    --background: hsl(247, 60%, 3%);
+    --primary: hsl(247, 65%, 73%);
+    --secondary: hsl(246, 78%, 33%);
+    --accent: hsl(246, 89%, 59%);
 
     /* Shadcn/UI base variables mapped to new simplified scheme for dark mode */
-    --card: var(--secondary);
-    --card-foreground: var(--foreground);
+    --foreground: var(--text);
+    --background: var(--background);
 
-    --popover: var(--secondary);
-    --popover-foreground: var(--foreground);
+    --card: var(--background);
+    --card-foreground: var(--text);
 
+    --popover: var(--background);
+    --popover-foreground: var(--text);
+
+    --primary: var(--primary);
     --primary-foreground: var(--background); /* Text on primary buttons */
 
-    --secondary-foreground: var(--foreground); /* Text on secondary elements */
+    --secondary: var(--secondary);
+    --secondary-foreground: var(--text); /* Text on secondary elements */
 
-    --muted: hsl(240, 15%, 20%); /* Slightly lighter than secondary for muted backgrounds */
-    --muted-foreground: var(--foreground);
+    --muted: var(--secondary); /* Using secondary for muted background */
+    --muted-foreground: var(--text);
 
-    --accent-foreground: var(--background); /* Text on accent elements */
+    --accent: var(--accent);
+    --accent-foreground: var(--background); /* Accent is vibrant, so foreground should be dark */
 
     --destructive: hsl(0, 70%, 50%); /* Standard red for destructive actions */
     --destructive-foreground: var(--foreground);
 
-    --border: hsl(240, 10%, 20%); /* Subtle border, slightly lighter than background */
+    --border: var(--secondary);
     --input: var(--secondary);
     --ring: var(--primary);
   }

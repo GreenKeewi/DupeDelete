@@ -19,10 +19,10 @@ export const Hero1 = () => (
           </p>
         </div>
         <div className="flex flex-row gap-3">
-          <Button size="lg" className="gap-4" variant="outline">
+          <Button size="lg" className="gap-4"> {/* Default variant uses primary color */}
             Clean up to 100 files free
           </Button>
-          <Button size="lg" className="gap-4">
+          <Button size="lg" className="gap-4" variant="accent"> {/* Using the new accent variant */}
             Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
           </Button>
         </div>

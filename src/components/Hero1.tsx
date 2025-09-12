@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { MoveRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -19,12 +20,16 @@ export const Hero1 = () => (
           </p>
         </div>
         <div className="flex flex-row gap-3">
-          <Button size="lg" className="gap-4" variant="outline">
-            Clean up to 100 files free
-          </Button>
-          <Button size="lg" className="gap-4">
-            Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
-          </Button>
+          <Link href="/cleanup">
+            <Button size="lg" className="gap-4" variant="outline">
+              Clean up to 100 files free
+            </Button>
+          </Link>
+          <Link href="/pricing">
+            <Button size="lg" className="gap-4">
+              Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

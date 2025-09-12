@@ -22,26 +22,16 @@ export const Navbar = () => {
         <div className="flex-none">
           <ul className="flex items-center space-x-4">
             <li>
-              <Link href="#" className="text-foreground hover:text-primary-foreground">
-                Link
+              <Link href="/pricing" className="text-foreground hover:text-primary-foreground">
+                Pricing
               </Link>
             </li>
             <li>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-1 text-foreground hover:text-primary-foreground">
-                    Parent <ChevronDown className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-40">
-                  <DropdownMenuItem>
-                    <Link href="#" className="block w-full text-left">Link 1</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="#" className="block w-full text-left">Link 2</Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Link href="/login">
+                <Button variant="ghost" className="text-foreground hover:text-primary-foreground">
+                  Login
+                </Button>
+              </Link>
             </li>
           </ul>
         </div>

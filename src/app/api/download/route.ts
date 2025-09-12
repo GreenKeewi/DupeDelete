@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import JSZip from "jszip";
 
 export async function POST(req: Request) {
   if (req.method !== "POST") {
@@ -9,18 +10,17 @@ export async function POST(req: Request) {
     const { filesToKeep } = await req.json();
     console.log("Files to keep for download:", filesToKeep);
 
-    // Simulate creating a zip file. In a real application, you would:
-    // 1. Receive identifiers for the files to keep.
-    // 2. Access these files from your storage (e.g., Supabase Storage, S3).
-    // 3. Create a zip archive containing only the selected files.
-    // 4. Stream the zip file back to the client.
+    const zip = new JSZip();
     
-    // For this mock, we'll return a simple text file with a .zip extension.
-    const dummyZipContent = `This is a dummy zip file content from DupeDelete.\nFiles that would be kept: ${filesToKeep.join(", ")}\n\nIn a real scenario, this would be a proper zip archive of your cleaned files.`;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(dummyZipContent);
+    // Add a dummy file to the zip archive to make it a valid zip.
+    // In a real application, you would fetch the actual files based on `filesToKeep`
+    // from your storage (e.g., Supabase Storage, S3) and add them to the zip.
+    const dummyContent = `This is your cleaned folder from DupeDelete.\n\nFiles that would have been kept:\n- ${filesToKeep.join("\n- ")}\n\nIn a real application, this would contain your actual cleaned files.`;
+    zip.file("cleaned_files_summary.txt", dummyContent);
 
-    return new NextResponse(data, {
+    const zipBlob = await zip.generateAsync({ type: "nodebuffer" });
+
+    return new NextResponse(zipBlob, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",

@@ -98,94 +98,40 @@
   }
 
   :root[data-theme="dark"] {
-    --text-50: hsl(246, 38%, 5%);
-    --text-100: hsl(243, 37%, 10%);
-    --text-200: hsl(245, 37%, 20%);
-    --text-300: hsl(245, 39%, 30%);
-    --text-400: hsl(245, 38%, 40%);
-    --text-500: hsl(245, 38%, 50%);
-    --text-600: hsl(245, 38%, 60%);
-    --text-700: hsl(245, 39%, 70%);
-    --text-800: hsl(245, 37%, 80%);
-    --text-900: hsl(243, 37%, 90%);
-    --text-950: hsl(246, 38%, 95%);
+    --text: hsl(245, 38%, 94%);
+    --background: hsl(248, 57%, 3%);
+    --primary: hsl(247, 65%, 73%);
+    --secondary: hsl(246, 78%, 33%);
+    --accent: hsl(246, 89%, 59%);
 
-    --background-50: hsl(248, 60%, 5%);
-    --background-100: hsl(248, 57%, 10%);
-    --background-200: hsl(248, 57%, 20%);
-    --background-300: hsl(248, 57%, 30%);
-    --background-400: hsl(248, 57%, 40%);
-    --background-500: hsl(248, 57%, 50%);
-    --background-600: hsl(248, 57%, 60%);
-    --background-700: hsl(248, 57%, 70%);
-    --background-800: hsl(248, 57%, 80%);
-    --background-900: hsl(248, 57%, 90%);
-    --background-950: hsl(248, 60%, 95%);
+    /* Shadcn/UI base variables mapped to new simplified scheme for dark mode */
+    --foreground: var(--text);
+    --background: var(--background);
 
-    --primary-50: hsl(247, 68%, 5%);
-    --primary-100: hsl(247, 65%, 10%);
-    --primary-200: hsl(247, 65%, 20%);
-    --primary-300: hsl(247, 65%, 30%);
-    --primary-400: hsl(247, 65%, 40%);
-    --primary-500: hsl(247, 65%, 50%);
-    --primary-600: hsl(247, 65%, 60%);
-    --primary-700: hsl(247, 65%, 70%);
-    --primary-800: hsl(247, 65%, 80%);
-    --primary-900: hsl(247, 65%, 90%);
-    --primary-950: hsl(247, 68%, 95%);
+    --card: var(--background);
+    --card-foreground: var(--text);
 
-    --secondary-50: hsl(246, 77%, 5%);
-    --secondary-100: hsl(246, 76%, 10%);
-    --secondary-200: hsl(246, 78%, 20%);
-    --secondary-300: hsl(246, 78%, 30%);
-    --secondary-400: hsl(246, 78%, 40%);
-    --secondary-500: hsl(246, 78%, 50%);
-    --secondary-600: hsl(246, 78%, 60%);
-    --secondary-700: hsl(246, 78%, 70%);
-    --secondary-800: hsl(246, 78%, 80%);
-    --secondary-900: hsl(246, 76%, 90%);
-    --secondary-950: hsl(246, 77%, 95%);
+    --popover: var(--background);
+    --popover-foreground: var(--text);
 
-    --accent-50: hsl(248, 92%, 5%);
-    --accent-100: hsl(245, 88%, 10%);
-    --accent-200: hsl(246, 88%, 20%);
-    --accent-300: hsl(246, 90%, 30%);
-    --accent-400: hsl(246, 89%, 40%);
-    --accent-500: hsl(246, 89%, 50%);
-    --accent-600: hsl(246, 89%, 60%);
-    --accent-700: hsl(246, 90%, 70%);
-    --accent-800: hsl(246, 88%, 80%);
-    --accent-900: hsl(245, 88%, 90%);
-    --accent-950: hsl(245, 92%, 95%);
+    --primary: var(--primary);
+    --primary-foreground: var(--background); /* Assuming primary is light, foreground should be dark */
 
-    /* Shadcn/UI base variables mapped to new scheme for dark mode */
-    --background: var(--background-950);
-    --foreground: var(--text-50);
+    --secondary: var(--secondary);
+    --secondary-foreground: var(--text);
 
-    --card: var(--background-900);
-    --card-foreground: var(--text-100);
+    --muted: var(--secondary); /* Using secondary for muted background */
+    --muted-foreground: var(--text);
 
-    --popover: var(--background-900);
-    --popover-foreground: var(--text-100);
+    --accent: var(--accent);
+    --accent-foreground: var(--background); /* Assuming accent is light, foreground should be dark */
 
-    --primary: var(--primary-500);
-    --primary-foreground: var(--primary-950);
+    --destructive: var(--primary); /* Reusing primary for destructive */
+    --destructive-foreground: var(--background);
 
-    --secondary: var(--secondary-900);
-    --secondary-foreground: var(--secondary-50);
-
-    --muted: var(--background-800);
-    --muted-foreground: var(--text-400);
-
-    --accent: var(--accent-900);
-    --accent-foreground: var(--accent-50);
-
-    --destructive: var(--primary-50); /* Using a light primary for destructive */
-    --destructive-foreground: var(--primary-950);
-
-    --border: var(--background-800);
-    --input: var(--background-800);
-    --ring: var(--primary-500);
+    --border: var(--secondary);
+    --input: var(--secondary);
+    --ring: var(--primary);
   }
 }
 

@@ -22,13 +22,15 @@ export const Navbar = () => {
         <div className="flex-none">
           <ul className="flex items-center space-x-4">
             <li>
-              <Link href="/pricing" className="text-foreground hover:text-primary-foreground">
-                Pricing
+              <Link href="/pricing">
+                <Button variant="ghost" className="text-foreground hover:text-primary-foreground">
+                  Pricing
+                </Button>
               </Link>
             </li>
             <li>
               <Link href="/login">
-                <Button variant="ghost" className="text-foreground hover:text-primary-foreground">
+                <Button variant="secondary" className="text-foreground hover:text-primary-foreground">
                   Login
                 </Button>
               </Link>

@@ -126,7 +126,7 @@
     --accent: var(--accent);
     --accent-foreground: var(--background); /* Accent is vibrant, so foreground should be dark */
 
-    --destructive: var(--primary); /* Reusing primary for destructive */
+    --destructive: var(--primary); /* Reusing primary for destructive. Consider a red hue if a traditional destructive color is needed. */
     --destructive-foreground: var(--background);
 
     --border: var(--secondary);

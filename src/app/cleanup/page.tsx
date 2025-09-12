@@ -1,20 +1,39 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Download } from "lucide-react";
+import { Trash2, Download, Image as ImageIcon } from "lucide-react";
+
+interface DuplicateFile {
+  id: string;
+  fileName: string;
+  path: string; // Original path, for context
+  type: "image" | "other"; // e.g., "image", "other"
+  previewUrl?: string; // For images, a URL to display the preview
+}
 
 export default function CleanupPage() {
   const [files, setFiles] = useState<File[]>([]);
-  const [duplicates, setDuplicates] = useState<any[]>([]); // This will eventually hold detected duplicates
+  const [duplicates, setDuplicates] = useState<DuplicateFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const router = useRouter();
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Clean up object URLs when component unmounts or duplicates change
+  useEffect(() => {
+    return () => {
+      duplicates.forEach(dup => {
+        if (dup.previewUrl) {
+          URL.revokeObjectURL(dup.previewUrl);
+        }
+      });
+    };
+  }, [duplicates]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const uploaded = Array.from(e.target.files);
 
@@ -23,7 +42,6 @@ export default function CleanupPage() {
       return;
     }
 
-    // Limit to 100 files for free plan
     if (uploaded.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
       router.push("/pricing");
@@ -32,16 +50,46 @@ export default function CleanupPage() {
 
     setFiles(uploaded);
     setIsProcessing(true);
+    setDuplicates([]); // Clear previous duplicates
     toast.loading("Uploading and scanning for duplicates...", { id: "upload-scan" });
+
+    // Process files to create preview URLs for images
+    const processedFiles: DuplicateFile[] = await Promise.all(uploaded.map(async (file, index) => {
+      const fileType = file.type.startsWith("image/") ? "image" : "other";
+      let previewUrl: string | undefined;
+
+      if (fileType === "image") {
+        previewUrl = URL.createObjectURL(file);
+      }
+
+      return {
+        id: `${file.name}-${index}`, // Simple unique ID
+        fileName: file.name,
+        path: `/${file.webkitRelativePath || file.name}`, // Use webkitRelativePath for folder structure
+        type: fileType,
+        previewUrl,
+      };
+    }));
 
     // Simulate backend processing for duplicate detection
     setTimeout(() => {
       // TODO: Replace with actual backend call for duplicate detection
-      const mockDuplicates = uploaded.length > 5 ? [
-        { id: "dup1", fileName: "document.pdf", path: "/folder/document.pdf" },
-        { id: "dup2", fileName: "image.jpg", path: "/folder/image.jpg" },
-      ] : [];
-      setDuplicates(mockDuplicates);
+      // For demonstration, let's create some mock duplicates from the uploaded files.
+      // We'll assume some files are duplicates of others.
+      const mockDuplicates: DuplicateFile[] = [];
+      if (processedFiles.length >= 2) {
+        // Example: if there are at least 2 files, mark the 2nd file as a duplicate
+        mockDuplicates.push({ ...processedFiles[1], id: `dup-${processedFiles[1].id}` });
+      }
+      if (processedFiles.length >= 4) {
+        // Example: if there are at least 4 files, mark the 4th file as a duplicate
+        mockDuplicates.push({ ...processedFiles[3], id: `dup-${processedFiles[3].id}` });
+      }
+      
+      // Filter out duplicates that might have been added multiple times if the original file was also a duplicate
+      const uniqueDuplicates = Array.from(new Map(mockDuplicates.map(item => [item.fileName, item])).values());
+
+      setDuplicates(uniqueDuplicates);
       setIsProcessing(false);
       toast.success("Scan complete! Review duplicates below.", { id: "upload-scan" });
     }, 3000);
@@ -73,13 +121,24 @@ export default function CleanupPage() {
     }
 
     toast.loading("Preparing your cleaned folder...", { id: "download-zip" });
-    // TODO: Replace with actual backend cleanup + zip generation
     try {
-      const res = await fetch("/api/download"); // This API route needs to be created
-      if (!res.ok) {
+      // Send the list of files to keep/delete to the backend
+      // For a real application, you'd send identifiers that the backend can use to locate the actual files.
+      // Here, we're just sending file names for a mock.
+      const filesToKeep = files.filter(file => !duplicates.some(dup => dup.fileName === file.name));
+      const response = await fetch("/api/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ filesToKeep: filesToKeep.map(f => f.name) }),
+      });
+
+      if (!response.ok) {
         throw new Error("Failed to download cleaned folder.");
       }
-      const blob = await res.blob();
+
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -145,12 +204,19 @@ export default function CleanupPage() {
             ) : duplicates.length === 0 ? (
               <p className="text-center text-muted-foreground">No duplicates found. Upload a folder to start.</p>
             ) : (
-              duplicates.map((group, i) => (
-                <div key={group.id || i} className="flex justify-between items-center border-b last:border-b-0 py-2">
-                  <span className="text-foreground text-sm md:text-base">{group.fileName}</span>
+              duplicates.map((dup) => (
+                <div key={dup.id} className="flex justify-between items-center border-b last:border-b-0 py-2">
+                  <div className="flex items-center gap-2">
+                    {dup.type === "image" && dup.previewUrl ? (
+                      <img src={dup.previewUrl} alt={dup.fileName} className="h-10 w-10 object-cover rounded-md" />
+                    ) : (
+                      <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                    )}
+                    <span className="text-foreground text-sm md:text-base">{dup.fileName}</span>
+                  </div>
                   <div className="space-x-2 flex">
-                    <Button variant="outline" size="sm" onClick={() => handleKeepFile(group.id)}>Keep</Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteFile(group.id)}>Delete</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleKeepFile(dup.id)}>Keep</Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDeleteFile(dup.id)}>Delete</Button>
                   </div>
                 </div>
               ))

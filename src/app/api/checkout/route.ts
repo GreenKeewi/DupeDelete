@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20", // Use a recent API version
+  apiVersion: "2025-08-27.basil", // Updated API version to resolve TypeScript error
 });
 
 export async function POST(req: Request) {

@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Download, Image as ImageIcon } from "lucide-react";
+import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
+import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog"; // Import the new component
 
 interface DuplicateFile {
   id: string;
@@ -14,47 +15,50 @@ interface DuplicateFile {
   path: string; // Original path, for context
   type: "image" | "other"; // e.g., "image", "other"
   previewUrl?: string; // For images, a URL to display the preview
+  originalFileId?: string; // New: Link to its original for comparison
 }
 
 export default function CleanupPage() {
-  const [files, setFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<DuplicateFile[]>([]); // Store all uploaded files for lookup
   const [duplicates, setDuplicates] = useState<DuplicateFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
+  const [selectedForComparison, setSelectedForComparison] = useState<{ original: DuplicateFile; duplicate: DuplicateFile } | null>(null);
   const router = useRouter();
 
   // Clean up object URLs when component unmounts or duplicates change
   useEffect(() => {
     return () => {
-      duplicates.forEach(dup => {
-        if (dup.previewUrl) {
-          URL.revokeObjectURL(dup.previewUrl);
+      uploadedFiles.forEach(file => {
+        if (file.previewUrl) {
+          URL.revokeObjectURL(file.previewUrl);
         }
       });
     };
-  }, [duplicates]);
+  }, [uploadedFiles]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const uploaded = Array.from(e.target.files);
+    const filesArray = Array.from(e.target.files);
 
-    if (uploaded.length === 0) {
+    if (filesArray.length === 0) {
       toast.info("No files selected.");
       return;
     }
 
-    if (uploaded.length > 100) {
+    if (filesArray.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
       router.push("/pricing");
       return;
     }
 
-    setFiles(uploaded);
     setIsProcessing(true);
     setDuplicates([]); // Clear previous duplicates
+    setSelectedForComparison(null); // Clear any previous comparison selection
     toast.loading("Uploading and scanning for duplicates...", { id: "upload-scan" });
 
-    // Process files to create preview URLs for images
-    const processedFiles: DuplicateFile[] = await Promise.all(uploaded.map(async (file, index) => {
+    // Process files to create preview URLs for images and assign unique IDs
+    const processedFiles: DuplicateFile[] = await Promise.all(filesArray.map(async (file, index) => {
       const fileType = file.type.startsWith("image/") ? "image" : "other";
       let previewUrl: string | undefined;
 
@@ -63,27 +67,35 @@ export default function CleanupPage() {
       }
 
       return {
-        id: `${file.name}-${index}`, // Simple unique ID
+        id: `file-${index}-${file.name}`, // More robust unique ID
         fileName: file.name,
-        path: `/${file.webkitRelativePath || file.name}`, // Use webkitRelativePath for folder structure
+        path: `/${file.webkitRelativePath || file.name}`,
         type: fileType,
         previewUrl,
       };
     }));
+    setUploadedFiles(processedFiles); // Store all processed files
 
     // Simulate backend processing for duplicate detection
     setTimeout(() => {
-      // TODO: Replace with actual backend call for duplicate detection
-      // For demonstration, let's create some mock duplicates from the uploaded files.
-      // We'll assume some files are duplicates of others.
       const mockDuplicates: DuplicateFile[] = [];
+      
+      // Create mock duplicates:
+      // If there are at least 2 files, make file[1] a duplicate of file[0]
       if (processedFiles.length >= 2) {
-        // Example: if there are at least 2 files, mark the 2nd file as a duplicate
-        mockDuplicates.push({ ...processedFiles[1], id: `dup-${processedFiles[1].id}` });
+        mockDuplicates.push({ 
+          ...processedFiles[1], 
+          id: `dup-${processedFiles[1].id}`, // Distinct ID for the duplicate entry
+          originalFileId: processedFiles[0].id // Link to the original
+        });
       }
+      // If there are at least 4 files, make file[3] a duplicate of file[2]
       if (processedFiles.length >= 4) {
-        // Example: if there are at least 4 files, mark the 4th file as a duplicate
-        mockDuplicates.push({ ...processedFiles[3], id: `dup-${processedFiles[3].id}` });
+        mockDuplicates.push({ 
+          ...processedFiles[3], 
+          id: `dup-${processedFiles[3].id}`, 
+          originalFileId: processedFiles[2].id 
+        });
       }
       
       // Filter out duplicates that might have been added multiple times if the original file was also a duplicate
@@ -110,12 +122,26 @@ export default function CleanupPage() {
     toast.success("File marked for deletion.");
   };
 
+  const handleCompare = (duplicate: DuplicateFile) => {
+    if (duplicate.originalFileId) {
+      const original = uploadedFiles.find(file => file.id === duplicate.originalFileId);
+      if (original) {
+        setSelectedForComparison({ original, duplicate });
+        setIsCompareDialogOpen(true);
+      } else {
+        toast.error("Original file for comparison not found.");
+      }
+    } else {
+      toast.info("This duplicate does not have a linked original for comparison in this mock.");
+    }
+  };
+
   const handleDownload = async () => {
     if (isProcessing) {
       toast.error("Please wait for the current operation to finish.");
       return;
     }
-    if (files.length === 0) {
+    if (uploadedFiles.length === 0) {
       toast.error("Please upload a folder first.");
       return;
     }
@@ -125,13 +151,13 @@ export default function CleanupPage() {
       // Send the list of files to keep/delete to the backend
       // For a real application, you'd send identifiers that the backend can use to locate the actual files.
       // Here, we're just sending file names for a mock.
-      const filesToKeep = files.filter(file => !duplicates.some(dup => dup.fileName === file.name));
+      const filesToKeep = uploadedFiles.filter(file => !duplicates.some(dup => dup.fileName === file.fileName));
       const response = await fetch("/api/download", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ filesToKeep: filesToKeep.map(f => f.name) }),
+        body: JSON.stringify({ filesToKeep: filesToKeep.map(f => f.fileName) }),
       });
 
       if (!response.ok) {
@@ -176,9 +202,9 @@ export default function CleanupPage() {
             className="hidden"
           />
           <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
-          {files.length > 0 && (
+          {uploadedFiles.length > 0 && (
             <p className="text-sm text-primary">
-              {files.length} files selected.
+              {uploadedFiles.length} files selected.
             </p>
           )}
         </CardContent>
@@ -215,6 +241,9 @@ export default function CleanupPage() {
                     <span className="text-foreground text-sm md:text-base">{dup.fileName}</span>
                   </div>
                   <div className="space-x-2 flex">
+                    <Button variant="outline" size="sm" onClick={() => handleCompare(dup)} disabled={!dup.originalFileId}>
+                      <Eye className="mr-1 h-4 w-4" /> Compare
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => handleKeepFile(dup.id)}>Keep</Button>
                     <Button variant="destructive" size="sm" onClick={() => handleDeleteFile(dup.id)}>Delete</Button>
                   </div>
@@ -226,12 +255,21 @@ export default function CleanupPage() {
           <Button
             onClick={handleDownload}
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            disabled={files.length === 0 || isProcessing}
+            disabled={uploadedFiles.length === 0 || isProcessing}
           >
             <Download className="mr-2 h-4 w-4" /> Download Cleaned Folder
           </Button>
         </CardContent>
       </Card>
+
+      {selectedForComparison && (
+        <DuplicateComparisonDialog
+          isOpen={isCompareDialogOpen}
+          onClose={() => setIsCompareDialogOpen(false)}
+          originalFile={selectedForComparison.original}
+          duplicateFile={selectedForComparison.duplicate}
+        />
+      )}
     </main>
   );
 }

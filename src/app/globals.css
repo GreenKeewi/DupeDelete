@@ -115,16 +115,16 @@
     --popover-foreground: var(--text);
 
     --primary: var(--primary);
-    --primary-foreground: var(--background); /* Assuming primary is light, foreground should be dark */
+    --primary-foreground: var(--background); /* Primary is light, so foreground should be dark */
 
     --secondary: var(--secondary);
-    --secondary-foreground: var(--text);
+    --secondary-foreground: var(--text); /* Secondary is dark, so foreground should be light */
 
     --muted: var(--secondary); /* Using secondary for muted background */
     --muted-foreground: var(--text);
 
     --accent: var(--accent);
-    --accent-foreground: var(--background); /* Assuming accent is light, foreground should be dark */
+    --accent-foreground: var(--background); /* Accent is vibrant, so foreground should be dark */
 
     --destructive: var(--primary); /* Reusing primary for destructive */
     --destructive-foreground: var(--background);

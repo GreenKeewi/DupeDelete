@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
+import { promises as fsp } from 'fs'; // Renamed to fsp for promise-based functions
+import * as fs from 'fs'; // Imported standard fs for createReadStream
 import path from 'path';
 import unzipper from 'unzipper';
 import { createTempDir, cleanupTempDir, getFilesInDir } from '@/lib/file-utils';
 import { scanFilesForDuplicates, DuplicateGroup } from '@/lib/duplicate-detection';
+
+// Declare module for unzipper is now in src/types/unzipper.d.ts
 
 // Set the maximum file size for uploads (e.g., 1GB)
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
@@ -45,10 +48,10 @@ export async function POST(req: Request) {
     // Save the uploaded zip file temporarily
     tempZipPath = path.join(extractedDirPath, file.name); // Store zip inside the job's extracted dir
     const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(tempZipPath, buffer);
+    await fsp.writeFile(tempZipPath, buffer); // Use fsp for promise-based writeFile
 
     // Extract the zip file
-    await fs.createReadStream(tempZipPath)
+    await fs.createReadStream(tempZipPath) // Use fs for createReadStream
       .pipe(unzipper.Extract({ path: extractedDirPath }))
       .promise();
 
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
     }
 
     const filesWithRelativePaths = await Promise.all(filesToScan.map(async (fullPath) => {
-      const stats = await fs.stat(fullPath);
+      const stats = await fsp.stat(fullPath); // Use fsp for promise-based stat
       return {
         fullPath,
         relativePath: path.relative(extractedDirPath!, fullPath),
@@ -81,7 +84,7 @@ export async function POST(req: Request) {
 
     // Clean up the temporary zip file, but keep the extracted directory for cleanup process
     if (tempZipPath) {
-      await fs.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err));
+      await fsp.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err)); // Use fsp for promise-based unlink
     }
 
     return NextResponse.json({ jobId, duplicateGroups });

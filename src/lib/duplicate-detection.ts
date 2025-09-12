@@ -1,8 +1,8 @@
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { imageHash } from 'image-hash';
-import Jimp from 'jimp';
+import imageHash from 'image-hash'; // Changed to default import
+import { v4 as uuidv4 } from 'uuid';
 
 export type FileType = 'image' | 'other';
 
@@ -40,7 +40,7 @@ async function getPerceptualHash(filePath: string): Promise<string> {
       path: filePath,
       mode: 'blockhash', // Using blockhash for perceptual hashing
       // Other options can be configured if needed, e.g., 'bits'
-    }, (error, data) => {
+    }, (error: Error | null, data: string) => {
       if (error) {
         console.error(`Error generating perceptual hash for ${filePath}:`, error);
         // Fallback to SHA256 or a placeholder hash if perceptual hashing fails

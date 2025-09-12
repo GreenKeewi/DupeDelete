@@ -33,6 +33,13 @@ export const Navbar = () => {
                 </Button>
               </Link>
             </li>
+            <li>
+              <Link href="/login">
+                <Button className="text-primary-foreground">
+                  Sign Up
+                </Button>
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

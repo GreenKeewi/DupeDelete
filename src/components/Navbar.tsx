@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
-import { ThemeSwitcher } from "./ThemeSwitcher"; // Import the new ThemeSwitcher
 
 export const Navbar = () => {
   return (
@@ -20,7 +19,7 @@ export const Navbar = () => {
             DupeDelete
           </Link>
         </div>
-        <div className="flex-none flex items-center space-x-4"> {/* Added flex and items-center for alignment */}
+        <div className="flex-none">
           <ul className="flex items-center space-x-4">
             <li>
               <Link href="#" className="text-foreground hover:text-primary-foreground">
@@ -45,7 +44,6 @@ export const Navbar = () => {
               </DropdownMenu>
             </li>
           </ul>
-          <ThemeSwitcher /> {/* Add the ThemeSwitcher here */}
         </div>
       </div>
     </nav>

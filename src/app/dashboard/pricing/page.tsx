@@ -1,21 +1,18 @@
 "use client";
 
-import { FeedbackBanner } from "@/components/dashboard/FeedbackBanner";
-import { DropzoneCard } from "@/components/dashboard/DropzoneCard";
-import { AccountPreviewCard } from "@/components/dashboard/AccountPreviewCard";
+import { PricingSection } from "@/components/PricingSection";
 import { useSession } from "@/components/SessionContextProvider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
-export default function DashboardOverviewPage() {
+export default function DashboardPricingPage() {
   const { user, isLoading } = useSession();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && !user) {
-      // If not loading and no user, redirect to login
-      router.push("/login?redirect_to=/dashboard");
+      router.push("/login?redirect_to=/dashboard/pricing");
     }
   }, [user, isLoading, router]);
 
@@ -29,17 +26,12 @@ export default function DashboardOverviewPage() {
   }
 
   if (!user) {
-    // This case should be handled by the useEffect redirect, but as a fallback
     return null;
   }
 
   return (
-    <div className="space-y-8">
-      <FeedbackBanner />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <DropzoneCard />
-        <AccountPreviewCard />
-      </div>
+    <div className="w-full">
+      <PricingSection />
     </div>
   );
 }

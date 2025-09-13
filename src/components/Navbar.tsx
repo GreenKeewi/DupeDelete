@@ -8,15 +8,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { ChevronDown, LayoutDashboard } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/components/SessionContextProvider"; // Import useSession
 
 export const Navbar = () => {
   const router = useRouter();
+  const { user, isLoading } = useSession(); // Use the session context
 
   const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
-    // If not on the home page, navigate to home and then scroll
     if (window.location.pathname !== '/') {
       router.push(`/#${sectionId}`);
     } else {
@@ -44,20 +45,32 @@ export const Navbar = () => {
                 </Button>
               </Link>
             </li>
-            <li>
-              <Link href="/login">
-                <Button variant="secondary" className="text-foreground hover:text-primary-foreground">
-                  Login
-                </Button>
-              </Link>
-            </li>
-            <li>
-              <Link href="/login">
-                <Button className="text-primary-foreground">
-                  Sign Up
-                </Button>
-              </Link>
-            </li>
+            {!isLoading && user ? ( // Show Dashboard button if logged in
+              <li>
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="text-foreground hover:text-primary-foreground flex items-center gap-2">
+                    <LayoutDashboard className="h-4 w-4" /> Dashboard
+                  </Button>
+                </Link>
+              </li>
+            ) : ( // Show Login/Sign Up if not logged in
+              <>
+                <li>
+                  <Link href="/login">
+                    <Button variant="secondary" className="text-foreground hover:text-primary-foreground">
+                      Login
+                    </Button>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/login">
+                    <Button className="text-primary-foreground">
+                      Sign Up
+                    </Button>
+                  </Link>
+                </li>
+              </>
+            )}
           </ul>
         </div>
       </div>

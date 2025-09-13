@@ -8,13 +8,13 @@ import { Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useSession } from "@/components/SessionContextProvider";
-import { useSubscription } from "@/hooks/use-subscription"; // Import useSubscription
-import { Badge } from "@/components/ui/badge"; // Import Badge component
+import { useSubscription } from "@/hooks/use-subscription";
+import { Badge } from "@/components/ui/badge";
 
 export const PricingSection = () => {
   const router = useRouter();
   const { user, isLoading: isSessionLoading } = useSession();
-  const { plan: activePlan, isBasic, isPro, isLoading: isSubscriptionLoading } = useSubscription(); // Get active plan details
+  const { plan: activePlan, isBasic, isPro, isLoading: isSubscriptionLoading } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
 
@@ -23,7 +23,7 @@ export const PricingSection = () => {
   const handleCheckout = async (selectedPlan: "basic" | "pro") => {
     if (!user) {
       toast.info("Please log in to subscribe.", { id: "login-redirect" });
-      router.push(`/login?redirect_to=${encodeURIComponent('/pricing')}`);
+      router.push(`/login?redirect_to=${encodeURIComponent('/dashboard/pricing')}`); // Redirect to dashboard pricing
       return;
     }
 
@@ -90,13 +90,12 @@ export const PricingSection = () => {
   };
 
   return (
-    <div id="pricing-section" className="flex flex-col items-center justify-center">
+    <div id="pricing-section" className="flex flex-col items-center justify-center w-full"> {/* Removed container and min-h styling */}
       <h1 className="text-4xl font-bold text-center mb-4">Choose Your Plan</h1>
       <p className="text-lg text-muted-foreground text-center mb-8 max-w-2xl">
         Unlock unlimited cleaning and advanced features with our flexible plans.
       </p>
 
-      {/* Monthly/Yearly Toggle */}
       <div className="flex items-center space-x-2 mb-12">
         <Label htmlFor="billing-toggle" className="text-lg">Monthly</Label>
         <Switch
@@ -110,7 +109,6 @@ export const PricingSection = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
-        {/* Basic Plan Card */}
         <Card className={`flex flex-col justify-between ${isPlanActive("basic") ? "border-primary shadow-lg" : ""}`}>
           <CardHeader>
             {isPlanActive("basic") && (
@@ -140,7 +138,6 @@ export const PricingSection = () => {
           </CardFooter>
         </Card>
 
-        {/* Pro Plan Card */}
         <Card className={`flex flex-col justify-between ${isPlanActive("pro") ? "border-primary shadow-lg" : ""}`}>
           <CardHeader>
             {isPlanActive("pro") && (

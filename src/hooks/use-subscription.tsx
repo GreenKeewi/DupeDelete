@@ -48,7 +48,7 @@ export const useSubscription = (): UserSubscription => {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error('Error fetching subscription:', error);
+        console.error('Error fetching subscription:', JSON.stringify(error, null, 2)); // Log full error object
         setSubscription(null);
       } else if (data) {
         setSubscription(data as UserSubscriptionData);

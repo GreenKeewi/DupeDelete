@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
-import { supabase, createServerSupabaseClient } from "@/integrations/supabase/client"; // Import both clients
+import { createServerSupabaseClient } from "@/integrations/supabase/client"; // Only import server client
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-08-27.basil",
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     let customerId: string | undefined;
 
     // Check if user already has a stripe_customer_id in their profile or subscriptions
-    const { data: existingSubscription, error: subError } = await serverSupabase // Use serverSupabase here too
+    const { data: existingSubscription, error: subError } = await serverSupabase // Use serverSupabase here
       .from('subscriptions')
       .select('stripe_customer_id')
       .eq('user_id', userId)

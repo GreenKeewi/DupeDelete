@@ -9,23 +9,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useScrollToSection } from "@/hooks/use-scroll-to-section"; // Import the new hook
 
 export const Navbar = () => {
-  const router = useRouter();
-
-  const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
-    e.preventDefault();
-    // If not on the home page, navigate to home and then scroll
-    if (window.location.pathname !== '/') {
-      router.push(`/#${sectionId}`);
-    } else {
-      const targetElement = document.getElementById(sectionId);
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
+  const scrollToSection = useScrollToSection(); // Use the new hook
 
   return (
     <nav className="bg-background shadow-sm border-b border-border sticky top-0 z-50">
@@ -38,7 +25,7 @@ export const Navbar = () => {
         <div className="flex-none">
           <ul className="flex items-center space-x-4">
             <li>
-              <Link href="/#pricing-section" onClick={(e) => handleScrollToSection(e, 'pricing-section')}>
+              <Link href="/#pricing-section" onClick={(e) => scrollToSection(e, 'pricing-section')}>
                 <Button variant="ghost" className="text-foreground hover:text-primary-foreground">
                   Pricing
                 </Button>

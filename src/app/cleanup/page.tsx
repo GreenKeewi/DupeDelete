@@ -6,41 +6,39 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
+import { Trash2, Download, Image as ImageIcon, Eye, AlertTriangle, FileWarning } from "lucide-react"; // Added AlertTriangle, FileWarning
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
-import { ScannedFile } from "@/lib/duplicate-detection"; // Import ScannedFile type from backend
+import { ScannedFile, DuplicateGroup, SimilarImageGroup, ComprehensiveScanResult } from "@/lib/duplicate-detection"; // Import all necessary types
 import JSZip from "jszip"; // Import JSZip
 import { apiFetcher } from "@/lib/api-utils"; // Import the new apiFetcher
 
-interface FrontendDuplicateFile {
-  id: string;
-  fileName: string;
-  relativePath: string; // Path relative to the extracted folder root
-  type: "image" | "other";
+// Frontend-specific types for display
+interface DisplayFile extends ScannedFile {
   previewUrl?: string; // For images, a URL to display the preview
-  originalFileId?: string; // Link to its original for comparison
-  detectionMethod?: 'MD5' | 'pHash' | 'SSIM'; // New: How it was detected
+  originalFileId?: string; // Link to its original for comparison (for duplicates/similar)
 }
 
 export default function CleanupPage() {
-  const [uploadedFiles, setUploadedFiles] = useState<ScannedFile[]>([]); // Store all scanned files from backend
-  const [duplicates, setDuplicates] = useState<FrontendDuplicateFile[]>([]); // Store only the duplicate entries for display
+  const [allScannedFiles, setAllScannedFiles] = useState<DisplayFile[]>([]); // Store all scanned files from backend
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]); // Store exact duplicate groups
+  const [similarImages, setSimilarImages] = useState<SimilarImageGroup[]>([]); // Store similar image groups
+  const [brokenFiles, setBrokenFiles] = useState<ScannedFile[]>([]); // Store broken files
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
   const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const router = useRouter();
 
-  // Clean up object URLs when component unmounts or uploadedFiles change
+  // Clean up object URLs when component unmounts or allScannedFiles change
   useEffect(() => {
     return () => {
-      uploadedFiles.forEach(file => {
+      allScannedFiles.forEach(file => {
         if (file.type === "image" && file.fullPath.startsWith("blob:")) { // Only revoke if it's a client-side generated URL
           URL.revokeObjectURL(file.fullPath);
         }
       });
     };
-  }, [uploadedFiles]);
+  }, [allScannedFiles]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -60,10 +58,12 @@ export default function CleanupPage() {
 
     setIsProcessing(true);
     setDuplicates([]); // Clear previous duplicates
-    setUploadedFiles([]); // Clear previous uploaded files
+    setSimilarImages([]); // Clear previous similar images
+    setBrokenFiles([]); // Clear previous broken files
+    setAllScannedFiles([]); // Clear previous uploaded files
     setSelectedForComparison(null); // Clear any previous comparison selection
     setJobId(null);
-    toast.loading("Zipping and uploading your folder...", { id: "upload-scan" });
+    toast.loading("Zipping and uploading your folder for scan...", { id: "upload-scan" });
 
     const zip = new JSZip();
     for (const file of filesArray) {
@@ -86,40 +86,39 @@ export default function CleanupPage() {
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
-      const { jobId, duplicateGroups, allScannedFiles } = await apiFetcher<{
-        jobId: string;
-        duplicateGroups: FrontendDuplicateFile[];
-        allScannedFiles: ScannedFile[];
-      }>("/api/upload", {
+      const scanResult = await apiFetcher<ComprehensiveScanResult>("/api/detect-duplicates", { // Changed endpoint
         method: "POST",
         body: formData,
         errorMessage: "Failed to upload and scan files."
       });
       
-      setJobId(jobId);
+      setJobId(scanResult.jobId);
+
+      // Combine all files from duplicates, similar images, and broken files into a single list for preview generation
+      const allFilesFromScan: ScannedFile[] = [];
+      scanResult.duplicates.forEach(group => {
+        allFilesFromScan.push(group.original, ...group.duplicates);
+      });
+      scanResult.similarImages.forEach(group => {
+        allFilesFromScan.push(group.original, ...group.similar);
+      });
+      allFilesFromScan.push(...scanResult.brokenFiles);
 
       // Create client-side preview URLs for all scanned image files
-      const filesWithPreviews: ScannedFile[] = allScannedFiles.map((file: ScannedFile) => {
+      const filesWithPreviews: DisplayFile[] = allFilesFromScan.map((file: ScannedFile) => {
         if (file.type === "image") {
-          return { ...file, fullPath: `/api/preview?jobId=${jobId}&relativePath=${encodeURIComponent(file.relativePath)}` };
+          return { ...file, previewUrl: `/api/preview?jobId=${scanResult.jobId}&relativePath=${encodeURIComponent(file.relativePath)}` };
         }
         return file;
       });
-      setUploadedFiles(filesWithPreviews);
+      setAllScannedFiles(filesWithPreviews);
 
-      // Map backend duplicate groups to frontend format, resolving preview URLs
-      const formattedDuplicates: FrontendDuplicateFile[] = duplicateGroups.map((dup: FrontendDuplicateFile) => {
-        const originalScannedFile = filesWithPreviews.find(f => f.id === dup.originalFileId);
-        const duplicateScannedFile = filesWithPreviews.find(f => f.id === dup.id);
-        return {
-          ...dup,
-          previewUrl: duplicateScannedFile?.fullPath, // Use the resolved fullPath as previewUrl
-          detectionMethod: dup.detectionMethod, // Pass the detection method
-        };
-      });
-      setDuplicates(formattedDuplicates);
+      // Update state with the comprehensive scan results
+      setDuplicates(scanResult.duplicates);
+      setSimilarImages(scanResult.similarImages);
+      setBrokenFiles(scanResult.brokenFiles);
 
-      toast.success("Scan complete! Review duplicate images below.", { id: "upload-scan" });
+      toast.success("Scan complete! Review results below.", { id: "upload-scan" });
     } catch (error: any) {
       console.error("Upload error:", error);
       // The apiFetcher already handles toast.error, so no need to duplicate here unless specific logic is needed
@@ -128,34 +127,59 @@ export default function CleanupPage() {
     }
   };
 
-  const handleDeleteAll = () => {
-    setDuplicates([]); // Clear all duplicates
-    toast.success("All duplicate images marked for deletion.");
-  };
-
-  const handleKeepFile = (id: string) => {
-    setDuplicates(duplicates.filter(dup => dup.id !== id));
+  const handleKeepFile = (fileId: string, groupType: 'duplicate' | 'similar', groupId: string) => {
+    if (groupType === 'duplicate') {
+      setDuplicates(prev => prev.map(group => {
+        if (group.original.id === groupId) {
+          return {
+            ...group,
+            duplicates: group.duplicates.filter(dup => dup.id !== fileId)
+          };
+        }
+        return group;
+      }).filter(group => group.duplicates.length > 0)); // Remove group if no duplicates left
+    } else if (groupType === 'similar') {
+      setSimilarImages(prev => prev.map(group => {
+        if (group.original.id === groupId) {
+          return {
+            ...group,
+            similar: group.similar.filter(sim => sim.id !== fileId)
+          };
+        }
+        return group;
+      }).filter(group => group.similar.length > 0)); // Remove group if no similar left
+    }
     toast.info("Image marked to keep.");
   };
 
-  const handleDeleteFile = (id: string) => {
-    setDuplicates(duplicates.filter(dup => dup.id !== id)); // Remove from duplicates list
+  const handleDeleteFile = (fileId: string, groupType: 'duplicate' | 'similar', groupId: string) => {
+    if (groupType === 'duplicate') {
+      setDuplicates(prev => prev.map(group => {
+        if (group.original.id === groupId) {
+          return {
+            ...group,
+            duplicates: group.duplicates.filter(dup => dup.id !== fileId)
+          };
+        }
+        return group;
+      }).filter(group => group.duplicates.length > 0));
+    } else if (groupType === 'similar') {
+      setSimilarImages(prev => prev.map(group => {
+        if (group.original.id === groupId) {
+          return {
+            ...group,
+            similar: group.similar.filter(sim => sim.id !== fileId)
+          };
+        }
+        return group;
+      }).filter(group => group.similar.length > 0));
+    }
     toast.success("Image marked for deletion.");
   };
 
-  const handleCompare = (duplicate: FrontendDuplicateFile) => {
-    if (duplicate.originalFileId) {
-      const original = uploadedFiles.find(file => file.id === duplicate.originalFileId);
-      const duplicateFull = uploadedFiles.find(file => file.id === duplicate.id);
-      if (original && duplicateFull) {
-        setSelectedForComparison({ original, duplicate: duplicateFull });
-        setIsCompareDialogOpen(true);
-      } else {
-        toast.error("Original or duplicate image for comparison not found.");
-      }
-    } else {
-      toast.info("This duplicate does not have a linked original for comparison.");
-    }
+  const handleCompare = (originalFile: ScannedFile, duplicateFile: ScannedFile) => {
+    setSelectedForComparison({ original: originalFile, duplicate: duplicateFile });
+    setIsCompareDialogOpen(true);
   };
 
   const handleDownload = async () => {
@@ -163,24 +187,49 @@ export default function CleanupPage() {
       toast.error("Please wait for the current operation to finish.");
       return;
     }
-    if (!jobId || uploadedFiles.length === 0) {
+    if (!jobId || allScannedFiles.length === 0) {
       toast.error("Please upload a folder first.");
       return;
     }
 
     toast.loading("Preparing your cleaned folder...", { id: "download-zip" });
     try {
-      // Send the list of files to keep to the backend
-      const filesToKeep = uploadedFiles.filter(file => !duplicates.some(dup => dup.id === file.id));
-      
-      // apiFetcher is designed for JSON responses. For file downloads, we need to handle the blob directly.
-      // So, we'll keep the direct fetch for the download endpoint, but add content-type check.
+      // Determine which files to keep: all original files from groups, and any files not marked as duplicate/similar
+      const filesToKeepRelativePaths: string[] = [];
+
+      // Add all original files from duplicate groups
+      duplicates.forEach(group => filesToKeepRelativePaths.push(group.original.relativePath));
+      // Add all original files from similar image groups
+      similarImages.forEach(group => filesToKeepRelativePaths.push(group.original.relativePath));
+
+      // Add any files that were not part of any duplicate/similar group (i.e., unique files)
+      // and were not broken.
+      const allDuplicateAndSimilarFileIds = new Set<string>();
+      duplicates.forEach(group => {
+        allDuplicateAndSimilarFileIds.add(group.original.id);
+        group.duplicates.forEach(dup => allDuplicateAndSimilarFileIds.add(dup.id));
+      });
+      similarImages.forEach(group => {
+        allDuplicateAndSimilarFileIds.add(group.original.id);
+        group.similar.forEach(sim => allDuplicateAndSimilarFileIds.add(sim.id));
+      });
+      brokenFiles.forEach(file => allDuplicateAndSimilarFileIds.add(file.id)); // Broken files are not kept
+
+      allScannedFiles.forEach(file => {
+        if (!allDuplicateAndSimilarFileIds.has(file.id) && !file.isBroken) {
+          filesToKeepRelativePaths.push(file.relativePath);
+        }
+      });
+
+      // Filter out any duplicates in the filesToKeepRelativePaths array
+      const uniqueFilesToKeep = Array.from(new Set(filesToKeepRelativePaths));
+
       const response = await fetch("/api/download", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ jobId, filesToKeep: filesToKeep.map(f => f.relativePath) }),
+        body: JSON.stringify({ jobId, filesToKeep: uniqueFilesToKeep }),
       });
 
       if (!response.ok) {
@@ -211,6 +260,31 @@ export default function CleanupPage() {
     }
   };
 
+  const renderFileItem = (file: DisplayFile, groupType: 'duplicate' | 'similar', groupId: string, originalFile?: ScannedFile) => (
+    <div key={file.id} className="flex justify-between items-center border-b last:border-b-0 py-2">
+      <div className="flex items-center gap-2">
+        {file.type === "image" && file.previewUrl ? (
+          <img src={file.previewUrl} alt={file.fileName} className="h-10 w-10 object-cover rounded-md" />
+        ) : (
+          <ImageIcon className="h-10 w-10 text-muted-foreground" />
+        )}
+        <span className="text-foreground text-sm md:text-base">{file.fileName}</span>
+        {file.detectionMethod && (
+          <span className="text-xs text-muted-foreground ml-2">({file.detectionMethod})</span>
+        )}
+      </div>
+      <div className="space-x-2 flex">
+        {originalFile && (
+          <Button variant="outline" size="sm" onClick={() => handleCompare(originalFile, file)}>
+            <Eye className="mr-1 h-4 w-4" /> Compare
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={() => handleKeepFile(file.id, groupType, groupId)}>Keep</Button>
+        <Button variant="destructive" size="sm" onClick={() => handleDeleteFile(file.id, groupType, groupId)}>Delete</Button>
+      </div>
+    </div>
+  );
+
   return (
     <main className="container mx-auto p-4 md:p-10 flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-128px)]">
       {/* Upload Area */}
@@ -233,9 +307,9 @@ export default function CleanupPage() {
             className="hidden"
           />
           <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
-          {uploadedFiles.length > 0 && (
+          {allScannedFiles.length > 0 && (
             <p className="text-sm text-primary">
-              {uploadedFiles.length} files selected.
+              {allScannedFiles.length} files selected.
             </p>
           )}
         </CardContent>
@@ -244,52 +318,88 @@ export default function CleanupPage() {
       {/* File Review Area */}
       <Card className="flex-1 p-6 space-y-6">
         <CardHeader>
-          <CardTitle className="text-2xl">Review Duplicate Images</CardTitle>
+          <CardTitle className="text-2xl">Scan Results</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button
-            onClick={handleDeleteAll}
-            className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            disabled={duplicates.length === 0 || isProcessing}
-          >
-            <Trash2 className="mr-2 h-4 w-4" /> Delete All Duplicate Images
-          </Button>
-
-          <div className="h-64 border rounded-md overflow-auto p-4 bg-background">
-            {isProcessing ? (
-              <p className="text-center text-muted-foreground">Scanning for duplicate images...</p>
-            ) : duplicates.length === 0 ? (
-              <p className="text-center text-muted-foreground">No duplicate images found. Upload a folder to start.</p>
-            ) : (
-              duplicates.map((dup) => (
-                <div key={dup.id} className="flex justify-between items-center border-b last:border-b-0 py-2">
-                  <div className="flex items-center gap-2">
-                    {dup.type === "image" && dup.previewUrl ? (
-                      <img src={dup.previewUrl} alt={dup.fileName} className="h-10 w-10 object-cover rounded-md" />
-                    ) : (
-                      <ImageIcon className="h-10 w-10 text-muted-foreground" />
-                    )}
-                    <span className="text-foreground text-sm md:text-base">{dup.fileName}</span>
-                    {dup.detectionMethod && (
-                      <span className="text-xs text-muted-foreground ml-2">({dup.detectionMethod})</span>
-                    )}
-                  </div>
-                  <div className="space-x-2 flex">
-                    <Button variant="outline" size="sm" onClick={() => handleCompare(dup)} disabled={!dup.originalFileId}>
-                      <Eye className="mr-1 h-4 w-4" /> Compare
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleKeepFile(dup.id)}>Keep</Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteFile(dup.id)}>Delete</Button>
+          {isProcessing ? (
+            <p className="text-center text-muted-foreground">Scanning for files...</p>
+          ) : (
+            <>
+              {/* Broken Files Section */}
+              {brokenFiles.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold flex items-center gap-2">
+                    <FileWarning className="h-5 w-5 text-destructive" /> Broken Files ({brokenFiles.length})
+                  </h3>
+                  <p className="text-sm text-muted-foreground">These files could not be read or are corrupted and will not be included in the cleaned folder.</p>
+                  <div className="h-48 border rounded-md overflow-auto p-4 bg-background">
+                    {brokenFiles.map((file) => (
+                      <div key={file.id} className="flex items-center gap-2 py-2 border-b last:border-b-0">
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                        <span className="text-foreground text-sm md:text-base">{file.fileName}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">({file.type === 'image' ? 'Corrupted Image' : 'Unreadable File'})</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              )}
+
+              {/* Duplicate Images Section */}
+              {duplicates.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold flex items-center gap-2">
+                    <Trash2 className="h-5 w-5 text-primary" /> Exact Duplicates ({duplicates.reduce((sum, group) => sum + group.duplicates.length, 0)})
+                  </h3>
+                  <p className="text-sm text-muted-foreground">These files are byte-identical copies. Keep one, delete the rest.</p>
+                  <div className="h-64 border rounded-md overflow-auto p-4 bg-background">
+                    {duplicates.map((group) => (
+                      <div key={group.original.id} className="mb-4 border-b pb-2 last:border-b-0 last:pb-0">
+                        <p className="font-medium text-sm mb-1">Original: {group.original.fileName}</p>
+                        {group.duplicates.map(dup => {
+                          const displayDup = allScannedFiles.find(f => f.id === dup.id);
+                          return displayDup ? renderFileItem(displayDup, 'duplicate', group.original.id, group.original) : null;
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Similar Images Section */}
+              {similarImages.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5 text-primary" /> Similar Images ({similarImages.reduce((sum, group) => sum + group.similar.length, 0)})
+                  </h3>
+                  <p className="text-sm text-muted-foreground">These images are visually similar. Review and decide which to keep.</p>
+                  <div className="h-64 border rounded-md overflow-auto p-4 bg-background">
+                    {similarImages.map((group) => (
+                      <div key={group.original.id} className="mb-4 border-b pb-2 last:border-b-0 last:pb-0">
+                        <p className="font-medium text-sm mb-1">Original: {group.original.fileName}</p>
+                        {group.similar.map(sim => {
+                          const displaySim = allScannedFiles.find(f => f.id === sim.id);
+                          return displaySim ? renderFileItem(displaySim, 'similar', group.original.id, group.original) : null;
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {duplicates.length === 0 && similarImages.length === 0 && brokenFiles.length === 0 && allScannedFiles.length > 0 && (
+                <p className="text-center text-muted-foreground">No duplicates, similar images, or broken files found. Your folder is clean!</p>
+              )}
+
+              {duplicates.length === 0 && similarImages.length === 0 && brokenFiles.length === 0 && allScannedFiles.length === 0 && (
+                <p className="text-center text-muted-foreground">Upload a folder to start scanning.</p>
+              )}
+            </>
+          )}
 
           <Button
             onClick={handleDownload}
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            disabled={!jobId || uploadedFiles.length === 0 || isProcessing}
+            disabled={!jobId || allScannedFiles.length === 0 || isProcessing}
           >
             <Download className="mr-2 h-4 w-4" /> Download Cleaned Folder
           </Button>

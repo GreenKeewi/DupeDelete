@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
 import { createTempDir, cleanupTempDir, getFilesInDir } from '@/lib/file-utils';
-import { scanFilesForDuplicates, DetectionConfig } from '@/lib/duplicate-detection';
+import { performComprehensiveScan, DetectionConfig, ComprehensiveScanResult, DuplicateGroup, SimilarImageGroup, ScannedFile } from '@/lib/duplicate-detection'; // Updated import
 
 // Set the maximum file size for uploads (e.g., 1GB)
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
@@ -95,35 +95,32 @@ export async function POST(req: Request) {
     }));
     console.log(`[Detect Duplicates API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`, filesWithRelativePaths);
 
-    // Run duplicate detection with configurable parameters
-    const duplicateGroups = await scanFilesForDuplicates(filesWithRelativePaths, detectionConfig);
-    console.log(`[Detect Duplicates API] Duplicate groups found (${duplicateGroups.length}):`, duplicateGroups);
+    // Run comprehensive detection with configurable parameters
+    const scanResult: ComprehensiveScanResult = await performComprehensiveScan(jobId, filesWithRelativePaths, detectionConfig);
+    console.log(`[Detect Duplicates API] Comprehensive scan result:`, scanResult);
 
     // Clean up the temporary zip file, but keep the extracted directory for cleanup process
     if (tempZipPath) {
       await fsp.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err));
     }
 
-    // Return the duplicate groups with metadata
+    // Return the comprehensive scan result
     return NextResponse.json({
-      jobId,
-      duplicateGroups,
-      totalFiles: filesWithRelativePaths.length,
-      duplicateCount: duplicateGroups.reduce((sum, group) => sum + group.duplicates.length, 0),
+      jobId: scanResult.jobId,
+      duplicates: scanResult.duplicates,
+      similarImages: scanResult.similarImages,
+      brokenFiles: scanResult.brokenFiles,
+      totalFilesScanned: scanResult.totalFilesScanned,
+      summary: scanResult.summary,
       detectionConfig: {
         similarityThreshold: detectionConfig.similarityThreshold || 5,
         ssimThreshold: detectionConfig.ssimThreshold || 0.90,
-        normalizedSize: detectionConfig.normalizedSize || 512,
+        normalizedSize: detectionConfig.normalizedSize || 256, // Corrected default
       },
-      summary: {
-        md5Duplicates: duplicateGroups.filter(g => g.detectionMethod === 'MD5').length,
-        pHashDuplicates: duplicateGroups.filter(g => g.detectionMethod === 'pHash').length,
-        ssimDuplicates: duplicateGroups.filter(g => g.detectionMethod === 'SSIM').length,
-      }
     });
 
   } catch (error) {
-    console.error('Error processing duplicate detection:', error);
+    console.error('Error processing comprehensive detection:', error);
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }

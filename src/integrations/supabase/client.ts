@@ -13,8 +13,8 @@ if (!SUPABASE_PUBLISHABLE_KEY) {
 }
 
 export const supabase = createClient(
-  SUPABASE_URL || 'http://localhost:3000', // Fallback for type safety, though it should be set
-  SUPABASE_PUBLISHABLE_KEY || 'dummy_key' // Fallback for type safety
+  SUPABASE_URL as string, // Cast to string, as the error check above handles missing values
+  SUPABASE_PUBLISHABLE_KEY as string // Cast to string
 );
 
 // Server-side Supabase client (for API routes/server components)

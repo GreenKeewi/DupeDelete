@@ -18,6 +18,7 @@ interface FrontendDuplicateFile {
   type: "image" | "other";
   previewUrl?: string; // For images, a URL to display the preview
   originalFileId?: string; // Link to its original for comparison
+  detectionMethod?: 'MD5' | 'pHash' | 'SSIM'; // New: How it was detected
 }
 
 export default function CleanupPage() {
@@ -105,10 +106,6 @@ export default function CleanupPage() {
       // Create client-side preview URLs for all scanned image files
       const filesWithPreviews: ScannedFile[] = allScannedFiles.map((file: ScannedFile) => {
         if (file.type === "image") {
-          // For now, we cannot directly create Object URLs from backend paths.
-          // This would require the backend to serve the images or return base64.
-          // For the current mock, we'll just use the fullPath as a placeholder.
-          // In a real app, you'd have an endpoint like /api/preview?jobId=...&relativePath=...
           return { ...file, fullPath: `/api/preview?jobId=${jobId}&relativePath=${encodeURIComponent(file.relativePath)}` };
         }
         return file;
@@ -122,6 +119,7 @@ export default function CleanupPage() {
         return {
           ...dup,
           previewUrl: duplicateScannedFile?.fullPath, // Use the resolved fullPath as previewUrl
+          detectionMethod: dup.detectionMethod, // Pass the detection method
         };
       });
       setDuplicates(formattedDuplicates);
@@ -266,6 +264,9 @@ export default function CleanupPage() {
                       <ImageIcon className="h-10 w-10 text-muted-foreground" />
                     )}
                     <span className="text-foreground text-sm md:text-base">{dup.fileName}</span>
+                    {dup.detectionMethod && (
+                      <span className="text-xs text-muted-foreground ml-2">({dup.detectionMethod})</span>
+                    )}
                   </div>
                   <div className="space-x-2 flex">
                     <Button variant="outline" size="sm" onClick={() => handleCompare(dup)} disabled={!dup.originalFileId}>

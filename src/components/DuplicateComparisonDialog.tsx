@@ -4,13 +4,13 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image as ImageIcon, FileText } from "lucide-react";
-import { ScannedFile } from "@/lib/duplicate-detection"; // Import ScannedFile
+import { ScannedFile } from "@/lib/duplicate-detection";
 
 interface DuplicateComparisonDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  originalFile: ScannedFile | null; // Use ScannedFile
-  duplicateFile: ScannedFile | null; // Use ScannedFile
+  originalFile: ScannedFile | null;
+  duplicateFile: ScannedFile | null;
 }
 
 export const DuplicateComparisonDialog: React.FC<DuplicateComparisonDialogProps> = ({
@@ -23,13 +23,13 @@ export const DuplicateComparisonDialog: React.FC<DuplicateComparisonDialogProps>
     return null; // Or handle this case with a loading state/error message
   }
 
-  const renderFileCard = (file: ScannedFile, title: string) => ( // Use ScannedFile
+  const renderFileCard = (file: ScannedFile, title: string) => (
     <Card className="flex-1">
       <CardHeader>
         <CardTitle className="text-lg">{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {file.type === "image" && file.fullPath ? ( // Use fullPath for previewUrl
+        {file.type === "image" && file.fullPath ? (
           <img src={file.fullPath} alt={file.fileName} className="max-h-48 w-full object-contain rounded-md border" />
         ) : (
           <div className="flex items-center justify-center h-48 bg-muted rounded-md border">
@@ -37,8 +37,11 @@ export const DuplicateComparisonDialog: React.FC<DuplicateComparisonDialogProps>
           </div>
         )}
         <p className="text-sm font-medium truncate">{file.fileName}</p>
-        <p className="text-xs text-muted-foreground break-all">Path: {file.relativePath}</p> {/* Use relativePath */}
+        <p className="text-xs text-muted-foreground break-all">Path: {file.relativePath}</p>
         <p className="text-xs text-muted-foreground">Type: {file.type}</p>
+        {file.detectionMethod && (
+          <p className="text-xs text-muted-foreground">Detected by: <span className="font-semibold">{file.detectionMethod}</span></p>
+        )}
       </CardContent>
     </Card>
   );

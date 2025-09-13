@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import imageHash from 'image-hash';
 import { v4 as uuidv4 } from 'uuid';
-import { Jimp } from 'jimp'; // Keep as named import
+import * as Jimp from 'jimp'; // Changed to namespace import for full access
 import { ssim } from 'ssim.js'; // Import ssim.js for SSIM comparison
 
 export type FileType = 'image' | 'other';
@@ -91,14 +91,14 @@ function getHammingDistance(hash1: string, hash2: string): number {
 
 async function getSsimSimilarity(imagePath1: string, imagePath2: string): Promise<number> {
   try {
-    // Use type assertion to bypass TypeScript's check on 'read'
-    const img1 = await (Jimp as any).read(imagePath1);
-    const img2 = await (Jimp as any).read(imagePath2);
+    const img1 = await Jimp.read(imagePath1);
+    const img2 = await Jimp.read(imagePath2);
 
+    // Resize images to a common smaller dimension for faster SSIM calculation
+    // and to handle slight resolution differences.
     const commonSize = 256; // e.g., 256x256
-    // Use type assertion to bypass TypeScript's check on 'constants'
-    img1.resize({ w: commonSize, h: commonSize, mode: (Jimp as any).constants.RESIZE_BICUBIC });
-    img2.resize({ w: commonSize, h: commonSize, mode: (Jimp as any).constants.RESIZE_BICUBIC });
+    img1.resize({ w: commonSize, h: commonSize, mode: Jimp.constants.RESIZE_BICUBIC });
+    img2.resize({ w: commonSize, h: commonSize, mode: Jimp.constants.RESIZE_BICUBIC });
 
     // Convert to raw pixel data for ssim.js
     // ssim.js expects Uint8ClampedArray for ImageData.data

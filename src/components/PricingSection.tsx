@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { useSession } from "@/components/SessionContextProvider"; // Removed .tsx extension
+import { useSession } from "@/components/SessionContextProvider"; // Corrected import path
 
 export const PricingSection = () => {
   const router = useRouter();

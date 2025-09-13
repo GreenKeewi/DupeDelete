@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-08-27.basil", // Updated API version to resolve TypeScript error
+  apiVersion: "2025-08-27.basil",
 });
 
 export async function POST(req: Request) {
@@ -11,19 +11,30 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { plan } = await req.json();
+    const { plan, interval } = await req.json(); // Get interval from request body
 
     if (!plan || (plan !== "basic" && plan !== "pro")) {
       return new NextResponse("Invalid plan specified", { status: 400 });
     }
+    if (!interval || (interval !== "monthly" && interval !== "yearly")) {
+      return new NextResponse("Invalid interval specified", { status: 400 });
+    }
 
-    const priceId = plan === "basic"
-      ? process.env.STRIPE_BASIC_PRICE_ID
-      : process.env.STRIPE_PRO_PRICE_ID;
+    let priceId: string | undefined;
+
+    if (plan === "basic") {
+      priceId = interval === "monthly"
+        ? process.env.STRIPE_BASIC_PRICE_ID
+        : process.env.STRIPE_BASIC_YEARLY_PRICE_ID; // Use new yearly price ID
+    } else if (plan === "pro") {
+      priceId = interval === "monthly"
+        ? process.env.STRIPE_PRO_PRICE_ID
+        : process.env.STRIPE_PRO_YEARLY_PRICE_ID; // Use new yearly price ID
+    }
 
     if (!priceId) {
-      console.error(`Stripe price ID not configured for plan: ${plan}`);
-      return new NextResponse(`Stripe price ID not configured for ${plan} plan.`, { status: 500 });
+      console.error(`Stripe price ID not configured for plan: ${plan} and interval: ${interval}`);
+      return new NextResponse(`Stripe price ID not configured for ${plan} ${interval} plan.`, { status: 500 });
     }
 
     const session = await stripe.checkout.sessions.create({

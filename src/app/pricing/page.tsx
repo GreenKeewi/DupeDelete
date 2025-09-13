@@ -5,21 +5,25 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch"; // Import Switch component
+import { Label } from "@/components/ui/label"; // Import Label component
 
 export default function PricingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [isYearly, setIsYearly] = useState(false); // New state for yearly toggle
 
   const handleCheckout = async (plan: "basic" | "pro") => {
     setLoading(true);
-    toast.loading(`Initiating ${plan} plan checkout...`, { id: "checkout" });
+    const interval = isYearly ? "yearly" : "monthly";
+    toast.loading(`Initiating ${plan} ${interval} plan checkout...`, { id: "checkout" });
     try {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, interval }), // Send interval to API
       });
 
       if (!response.ok) {
@@ -41,17 +45,31 @@ export default function PricingPage() {
 
   return (
     <main className="container mx-auto p-4 md:p-10 min-h-[calc(100vh-128px)] flex flex-col items-center justify-center">
-      <h1 className="text-4xl font-bold text-center mb-8">Choose Your Plan</h1>
-      <p className="text-lg text-muted-foreground text-center mb-12 max-w-2xl">
+      <h1 className="text-4xl font-bold text-center mb-4">Choose Your Plan</h1>
+      <p className="text-lg text-muted-foreground text-center mb-8 max-w-2xl">
         Unlock unlimited cleaning and advanced features with our flexible plans.
       </p>
+
+      {/* Monthly/Yearly Toggle */}
+      <div className="flex items-center space-x-2 mb-12">
+        <Label htmlFor="billing-toggle" className="text-lg">Monthly</Label>
+        <Switch
+          id="billing-toggle"
+          checked={isYearly}
+          onCheckedChange={setIsYearly}
+          className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground"
+        />
+        <Label htmlFor="billing-toggle" className="text-lg">Yearly</Label>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
         {/* Basic Plan Card */}
         <Card className="flex flex-col justify-between">
           <CardHeader>
             <CardTitle className="text-3xl">Basic Plan</CardTitle>
-            <CardDescription className="text-lg mt-2">$10/month</CardDescription>
+            <CardDescription className="text-lg mt-2">
+              {isYearly ? "$100/year" : "$10/month"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">Perfect for occasional cleaning.</p>
@@ -67,7 +85,7 @@ export default function PricingPage() {
               onClick={() => handleCheckout("basic")}
               disabled={loading}
             >
-              {loading ? "Processing..." : "Get Basic Plan"}
+              {loading ? "Processing..." : `Get Basic Plan (${isYearly ? "Yearly" : "Monthly"})`}
             </Button>
           </CardFooter>
         </Card>
@@ -76,7 +94,9 @@ export default function PricingPage() {
         <Card className="flex flex-col justify-between border-primary shadow-lg">
           <CardHeader>
             <CardTitle className="text-3xl">Pro Plan</CardTitle>
-            <CardDescription className="text-lg mt-2">$16/month</CardDescription>
+            <CardDescription className="text-lg mt-2">
+              {isYearly ? "$160/year" : "$16/month"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">For power users with large collections.</p>
@@ -93,7 +113,7 @@ export default function PricingPage() {
               onClick={() => handleCheckout("pro")}
               disabled={loading}
             >
-              {loading ? "Processing..." : "Get Pro Plan"}
+              {loading ? "Processing..." : `Get Pro Plan (${isYearly ? "Yearly" : "Monthly"})`}
             </Button>
           </CardFooter>
         </Card>

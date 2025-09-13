@@ -3,7 +3,7 @@
 import { useSession } from "@/components/SessionContextProvider";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react"; // Import useState
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,10 +12,74 @@ import { Loader2, Mail, CreditCard, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+// Form imports
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"; // Assuming you have these Shadcn form components
+
+// Define Zod schema for profile form
+const ProfileFormSchema = z.object({
+  first_name: z.string().max(50, { message: "First name must not be longer than 50 characters." }).optional(),
+  last_name: z.string().max(50, { message: "Last name must not be longer than 50 characters." }).optional(),
+});
+
+type ProfileFormValues = z.infer<typeof ProfileFormSchema>;
+
 export default function AccountPage() {
   const { user, isLoading: isSessionLoading } = useSession();
   const { plan, status, currentPeriodEnd, isLoading: isSubscriptionLoading } = useSubscription();
   const router = useRouter();
+  const [isProfileUpdating, setIsProfileUpdating] = useState(false);
+  const [profileData, setProfileData] = useState<{ first_name: string | null; last_name: string | null } | null>(null);
+  const [isProfileDataLoading, setIsProfileDataLoading] = useState(true);
+
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(ProfileFormSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+    },
+    mode: "onChange",
+  });
+
+  // Fetch profile data on component mount or user change
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        setIsProfileDataLoading(true);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error fetching profile for account page:", error);
+          toast.error("Failed to load profile data.");
+          setProfileData(null);
+        } else if (data) {
+          setProfileData(data);
+          form.reset({
+            first_name: data.first_name || "",
+            last_name: data.last_name || "",
+          });
+        } else {
+          setProfileData(null);
+          form.reset({ first_name: "", last_name: "" });
+        }
+        setIsProfileDataLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [user, form]);
 
   useEffect(() => {
     if (!isSessionLoading && !user) {
@@ -23,7 +87,7 @@ export default function AccountPage() {
     }
   }, [user, isSessionLoading, router]);
 
-  if (isSessionLoading || isSubscriptionLoading) {
+  if (isSessionLoading || isSubscriptionLoading || isProfileDataLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-128px)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -35,6 +99,29 @@ export default function AccountPage() {
   if (!user) {
     return null;
   }
+
+  const onSubmit = async (values: ProfileFormValues) => {
+    setIsProfileUpdating(true);
+    toast.loading("Updating profile...", { id: "update-profile" });
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        first_name: values.first_name,
+        last_name: values.last_name,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id);
+
+    if (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile. Please try again.", { id: "update-profile" });
+    } else {
+      toast.success("Profile updated successfully!", { id: "update-profile" });
+      router.refresh(); // Trigger a refresh to update data across the app
+    }
+    setIsProfileUpdating(false);
+  };
 
   const handleManageSubscription = async () => {
     toast.info("Redirecting to Stripe customer portal...", { id: "manage-sub" });
@@ -56,16 +143,44 @@ export default function AccountPage() {
           <CardDescription>Manage your personal details.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={user.email || ""} disabled className="mt-1" />
-          </div>
-          {/* Add more profile fields if available (e.g., first name, last name) */}
-          {/* <div>
-            <Label htmlFor="firstName">First Name</Label>
-            <Input id="firstName" type="text" value={user.user_metadata.first_name || ""} className="mt-1" />
-          </div> */}
-          <Button disabled>Save Profile</Button>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" value={user.email || ""} disabled className="mt-1" />
+              </div>
+              <FormField
+                control={form.control}
+                name="first_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Your first name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="last_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Your last name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={isProfileUpdating || !form.formState.isDirty}>
+                {isProfileUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Profile
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 
@@ -98,19 +213,6 @@ export default function AccountPage() {
           </Button>
         </CardContent>
       </Card>
-
-      {/* Add a section for deleting account if desired */}
-      {/* <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trash2 className="h-5 w-5 text-destructive" /> Danger Zone
-          </CardTitle>
-          <CardDescription>Actions that cannot be undone.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive">Delete My Account</Button>
-        </CardContent>
-      </Card> */}
     </div>
   );
 }

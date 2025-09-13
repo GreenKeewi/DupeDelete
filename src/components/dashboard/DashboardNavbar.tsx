@@ -28,7 +28,7 @@ export const DashboardNavbar = () => {
       <div className="container mx-auto flex items-center justify-between h-full px-4">
         <div className="flex-1">
           <Link href="/dashboard" className="text-xl font-bold text-foreground flex items-center gap-2">
-            <LayoutDashboard className="h-6 w-6" /> DupeDelete Dashboard
+            <LayoutDashboard className="h-6 w-6" /> Dashboard
           </Link>
         </div>
         <div className="flex-none">

@@ -10,6 +10,7 @@ import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
 import { ScannedFile } from "@/lib/duplicate-detection"; // Import ScannedFile type from backend
 import JSZip from "jszip"; // Import JSZip
+import { apiFetcher } from "@/lib/api-utils"; // Import the new apiFetcher
 
 interface FrontendDuplicateFile {
   id: string;
@@ -85,22 +86,16 @@ export default function CleanupPage() {
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
-      const response = await fetch("/api/upload", {
+      const { jobId, duplicateGroups, allScannedFiles } = await apiFetcher<{
+        jobId: string;
+        duplicateGroups: FrontendDuplicateFile[];
+        allScannedFiles: ScannedFile[];
+      }>("/api/upload", {
         method: "POST",
         body: formData,
+        errorMessage: "Failed to upload and scan files."
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (response.status === 403 && errorData.redirect) {
-          toast.warning(errorData.message, { id: "upload-scan" });
-          router.push(errorData.redirect);
-          return;
-        }
-        throw new Error(errorData.message || "Failed to upload and scan files.");
-      }
-
-      const { jobId, duplicateGroups, allScannedFiles } = await response.json();
+      
       setJobId(jobId);
 
       // Create client-side preview URLs for all scanned image files
@@ -127,7 +122,7 @@ export default function CleanupPage() {
       toast.success("Scan complete! Review duplicate images below.", { id: "upload-scan" });
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
+      // The apiFetcher already handles toast.error, so no need to duplicate here unless specific logic is needed
     } finally {
       setIsProcessing(false);
     }
@@ -177,6 +172,9 @@ export default function CleanupPage() {
     try {
       // Send the list of files to keep to the backend
       const filesToKeep = uploadedFiles.filter(file => !duplicates.some(dup => dup.id === file.id));
+      
+      // apiFetcher is designed for JSON responses. For file downloads, we need to handle the blob directly.
+      // So, we'll keep the direct fetch for the download endpoint, but add content-type check.
       const response = await fetch("/api/download", {
         method: "POST",
         headers: {
@@ -186,7 +184,15 @@ export default function CleanupPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to download cleaned folder.");
+        const contentType = response.headers.get("Content-Type");
+        if (contentType?.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to download cleaned folder.");
+        } else {
+          const textResponse = await response.text();
+          console.error("Download API Error: Non-JSON response received.", textResponse.substring(0, 200));
+          throw new Error(`Failed to download cleaned folder. Received non-JSON response. Body: ${textResponse.substring(0, 200)}...`);
+        }
       }
 
       const blob = await response.blob();
@@ -201,7 +207,7 @@ export default function CleanupPage() {
       toast.success("Cleaned folder downloaded successfully!", { id: "download-zip" });
     } catch (error) {
       console.error("Download error:", error);
-      toast.error("Failed to download cleaned folder.", { id: "download-zip" });
+      toast.error((error as Error).message || "Failed to download cleaned folder.", { id: "download-zip" });
     }
   };
 

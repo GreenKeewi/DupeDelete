@@ -8,6 +8,7 @@ import { Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useSession } from "@/components/SessionContextProvider"; // Corrected import path
+import { apiFetcher } from "@/lib/api-utils"; // Import the new apiFetcher
 
 export const PricingSection = () => {
   const router = useRouter();
@@ -27,27 +28,23 @@ export const PricingSection = () => {
     const interval = isYearly ? "yearly" : "monthly";
     toast.loading(`Initiating ${plan} ${interval} plan checkout...`, { id: "checkout" });
     try {
-      const response = await fetch("/api/checkout", {
+      const { url } = await apiFetcher<{ url: string }>("/api/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ plan, interval, userId: user.id }), // Pass userId to backend
+        errorMessage: "Failed to start checkout."
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to create checkout session.");
-      }
-
-      const { url } = await response.json();
       if (url) {
         router.push(url);
       } else {
-        throw new Error("No checkout URL received.");
+        throw new Error("No checkout URL received."); // This should ideally be caught by apiFetcher's error handling if response.ok is false
       }
     } catch (error) {
       console.error("Stripe checkout error:", error);
-      toast.error("Failed to start checkout. Please try again.", { id: "checkout" });
+      // The apiFetcher already handles toast.error, so no need to duplicate here unless specific logic is needed
       setLoading(false);
     }
   };

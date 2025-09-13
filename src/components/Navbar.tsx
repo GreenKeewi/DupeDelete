@@ -9,14 +9,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
+import { useSession } from "@/components/SessionContextProvider"; // Import useSession
+import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+import { toast } from "sonner";
 
 export const Navbar = () => {
   const router = useRouter();
+  const { user, isLoading } = useSession(); // Get user and loading state from session
 
   const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
-    // If not on the home page, navigate to home and then scroll
     if (window.location.pathname !== '/') {
       router.push(`/#${sectionId}`);
     } else {
@@ -24,6 +27,17 @@ export const Navbar = () => {
       if (targetElement) {
         targetElement.scrollIntoView({ behavior: 'smooth' });
       }
+    }
+  };
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to log out.");
+    } else {
+      toast.success("Logged out successfully!");
+      router.push("/"); // Redirect to home page after logout
     }
   };
 
@@ -44,20 +58,46 @@ export const Navbar = () => {
                 </Button>
               </Link>
             </li>
-            <li>
-              <Link href="/login">
-                <Button variant="secondary" className="text-foreground hover:text-primary-foreground">
-                  Login
-                </Button>
-              </Link>
-            </li>
-            <li>
-              <Link href="/login">
-                <Button className="text-primary-foreground">
-                  Sign Up
-                </Button>
-              </Link>
-            </li>
+            {isLoading ? (
+              // Show a loading state for auth buttons
+              <li>
+                <Button variant="secondary" disabled>Loading...</Button>
+              </li>
+            ) : user ? (
+              // User is logged in
+              <>
+                <li>
+                  <Link href="/dashboard"> {/* Assuming a dashboard route */}
+                    <Button variant="ghost" className="text-foreground hover:text-primary-foreground">
+                      Dashboard
+                    </Button>
+                  </Link>
+                </li>
+                <li>
+                  <Button onClick={handleLogout} className="text-primary-foreground">
+                    Logout
+                  </Button>
+                </li>
+              </>
+            ) : (
+              // User is not logged in
+              <>
+                <li>
+                  <Link href="/login">
+                    <Button variant="secondary" className="text-foreground hover:text-primary-foreground">
+                      Login
+                    </Button>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/login">
+                    <Button className="text-primary-foreground">
+                      Sign Up
+                    </Button>
+                  </Link>
+                </li>
+              </>
+            )}
           </ul>
         </div>
       </div>

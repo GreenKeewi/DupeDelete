@@ -8,33 +8,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
-import { ScannedFile } from "@/lib/duplicate-detection"; // Import ScannedFile type from backend
-import JSZip from "jszip"; // Import JSZip
+import { ScannedFile } from "@/lib/duplicate-detection";
+import JSZip from "jszip";
+import { useSession } from "@/components/SessionContextProvider"; // Import useSession
 
 interface FrontendDuplicateFile {
   id: string;
   fileName: string;
-  relativePath: string; // Path relative to the extracted folder root
+  relativePath: string;
   type: "image" | "other";
-  previewUrl?: string; // For images, a URL to display the preview
-  originalFileId?: string; // Link to its original for comparison
-  detectionMethod?: 'MD5' | 'pHash' | 'SSIM'; // New: How it was detected
+  previewUrl?: string;
+  originalFileId?: string;
+  detectionMethod?: 'MD5' | 'pHash' | 'SSIM';
 }
 
 export default function CleanupPage() {
-  const [uploadedFiles, setUploadedFiles] = useState<ScannedFile[]>([]); // Store all scanned files from backend
-  const [duplicates, setDuplicates] = useState<FrontendDuplicateFile[]>([]); // Store only the duplicate entries for display
+  const { user, isLoading } = useSession(); // Get user and loading state
+  const router = useRouter();
+
+  // Redirect if not logged in and not loading
+  useEffect(() => {
+    if (!isLoading && !user) {
+      toast.info("Please log in to access the cleanup page.");
+      router.push(`/login?redirect_to=${encodeURIComponent('/cleanup')}`);
+    }
+  }, [user, isLoading, router]);
+
+  const [uploadedFiles, setUploadedFiles] = useState<ScannedFile[]>([]);
+  const [duplicates, setDuplicates] = useState<FrontendDuplicateFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
   const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const router = useRouter();
 
-  // Clean up object URLs when component unmounts or uploadedFiles change
   useEffect(() => {
     return () => {
       uploadedFiles.forEach(file => {
-        if (file.type === "image" && file.fullPath.startsWith("blob:")) { // Only revoke if it's a client-side generated URL
+        if (file.type === "image" && file.fullPath.startsWith("blob:")) {
           URL.revokeObjectURL(file.fullPath);
         }
       });
@@ -50,7 +60,6 @@ export default function CleanupPage() {
       return;
     }
 
-    // The 100-file limit is now enforced on the backend, but a client-side check can provide faster feedback
     if (filesArray.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
       router.push("/pricing");
@@ -58,15 +67,14 @@ export default function CleanupPage() {
     }
 
     setIsProcessing(true);
-    setDuplicates([]); // Clear previous duplicates
-    setUploadedFiles([]); // Clear previous uploaded files
-    setSelectedForComparison(null); // Clear any previous comparison selection
+    setDuplicates([]);
+    setUploadedFiles([]);
+    setSelectedForComparison(null);
     setJobId(null);
     toast.loading("Zipping and uploading your folder...", { id: "upload-scan" });
 
     const zip = new JSZip();
     for (const file of filesArray) {
-      // Use webkitRelativePath for folder structure, fallback to name
       const filePathInZip = file.webkitRelativePath || file.name;
       zip.file(filePathInZip, file);
     }
@@ -103,7 +111,6 @@ export default function CleanupPage() {
       const { jobId, duplicateGroups, allScannedFiles } = await response.json();
       setJobId(jobId);
 
-      // Create client-side preview URLs for all scanned image files
       const filesWithPreviews: ScannedFile[] = allScannedFiles.map((file: ScannedFile) => {
         if (file.type === "image") {
           return { ...file, fullPath: `/api/preview?jobId=${jobId}&relativePath=${encodeURIComponent(file.relativePath)}` };
@@ -112,14 +119,13 @@ export default function CleanupPage() {
       });
       setUploadedFiles(filesWithPreviews);
 
-      // Map backend duplicate groups to frontend format, resolving preview URLs
       const formattedDuplicates: FrontendDuplicateFile[] = duplicateGroups.map((dup: FrontendDuplicateFile) => {
         const originalScannedFile = filesWithPreviews.find(f => f.id === dup.originalFileId);
         const duplicateScannedFile = filesWithPreviews.find(f => f.id === dup.id);
         return {
           ...dup,
-          previewUrl: duplicateScannedFile?.fullPath, // Use the resolved fullPath as previewUrl
-          detectionMethod: dup.detectionMethod, // Pass the detection method
+          previewUrl: duplicateScannedFile?.fullPath,
+          detectionMethod: dup.detectionMethod,
         };
       });
       setDuplicates(formattedDuplicates);
@@ -134,7 +140,7 @@ export default function CleanupPage() {
   };
 
   const handleDeleteAll = () => {
-    setDuplicates([]); // Clear all duplicates
+    setDuplicates([]);
     toast.success("All duplicate images marked for deletion.");
   };
 
@@ -144,7 +150,7 @@ export default function CleanupPage() {
   };
 
   const handleDeleteFile = (id: string) => {
-    setDuplicates(duplicates.filter(dup => dup.id !== id)); // Remove from duplicates list
+    setDuplicates(duplicates.filter(dup => dup.id !== id));
     toast.success("Image marked for deletion.");
   };
 
@@ -175,7 +181,6 @@ export default function CleanupPage() {
 
     toast.loading("Preparing your cleaned folder...", { id: "download-zip" });
     try {
-      // Send the list of files to keep to the backend
       const filesToKeep = uploadedFiles.filter(file => !duplicates.some(dup => dup.id === file.id));
       const response = await fetch("/api/download", {
         method: "POST",
@@ -204,6 +209,15 @@ export default function CleanupPage() {
       toast.error("Failed to download cleaned folder.", { id: "download-zip" });
     }
   };
+
+  if (isLoading || (!user && !isLoading)) {
+    // Show a loading spinner or a message while checking session or if redirecting
+    return (
+      <main className="container mx-auto p-4 md:p-10 flex flex-col items-center justify-center min-h-[calc(100vh-128px)]">
+        <p className="text-lg text-muted-foreground">Loading user session...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="container mx-auto p-4 md:p-10 flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-128px)]">

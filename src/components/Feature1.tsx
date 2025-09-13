@@ -2,6 +2,8 @@
 
 import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link"; // Import Link
+import { Button } from "@/components/ui/button"; // Import Button
 
 export const Feature1 = () => (
   <div id="how-it-works" className="w-full py-20 lg:py-40">
@@ -49,6 +51,14 @@ export const Feature1 = () => (
                 </p>
               </div>
             </div>
+          </div>
+          {/* New section for pricing link */}
+          <div className="mt-8 text-center lg:text-left">
+            <Link href="/pricing">
+              <Button variant="default" size="lg">
+                View Pricing Plans
+              </Button>
+            </Link>
           </div>
         </div>
         <div className="bg-muted rounded-md aspect-square flex items-center justify-center text-muted-foreground p-6">

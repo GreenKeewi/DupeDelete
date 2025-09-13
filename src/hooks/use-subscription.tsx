@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/SessionContextProvider';
 
-export interface Subscription {
+export interface UserSubscriptionData {
   id: string;
   user_id: string;
   stripe_customer_id: string | null;
@@ -27,7 +27,7 @@ export interface UserSubscription {
 
 export const useSubscription = (): UserSubscription => {
   const { user, isLoading: isSessionLoading } = useSession();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscription, setSubscription] = useState<UserSubscriptionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export const useSubscription = (): UserSubscription => {
         console.error('Error fetching subscription:', error);
         setSubscription(null);
       } else if (data) {
-        setSubscription(data);
+        setSubscription(data as UserSubscriptionData);
       } else {
         // If no subscription found, assume free plan
         setSubscription({

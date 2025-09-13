@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import StripeSDK from 'stripe'; // Aliasing Stripe to StripeSDK
+import StripeSDK from 'stripe'; // Import Stripe as a default export
 import { supabase } from '@/integrations/supabase/client'; // Import Supabase client
 
 const stripe = new StripeSDK(process.env.STRIPE_SECRET_KEY!, {
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   const sig = req.headers.get('stripe-signature');
 
-  let event: StripeSDK.Event; // Use StripeSDK.Event
+  let event: StripeSDK.Event;
 
   try {
     event = stripe.webhooks.constructEvent(buf, sig!, webhookSecret);
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        const checkoutSession = event.data.object as StripeSDK.Checkout.Session; // Use StripeSDK.Checkout.Session
+        const checkoutSession = event.data.object as StripeSDK.Checkout.Session; // Corrected type reference
         const userId = checkoutSession.client_reference_id;
         const customerId = checkoutSession.customer as string;
         const subscriptionId = checkoutSession.subscription as string;
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
         }
 
         // Retrieve the subscription to get current_period_end
-        const stripeSubscription: StripeSDK.Subscription = await stripe.subscriptions.retrieve(subscriptionId); // Use StripeSDK.Subscription
+        const stripeSubscription: StripeSDK.Subscription = await stripe.subscriptions.retrieve(subscriptionId); // Corrected type reference
 
         const { data, error } = await supabase
           .from('subscriptions')
@@ -72,8 +72,8 @@ export async function POST(req: Request) {
 
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        const subscription: StripeSDK.Subscription = event.data.object as StripeSDK.Subscription; // Use StripeSDK.Subscription
-        let updatedUserId = subscription.metadata.supabase_user_id; // Changed to 'let'
+        const subscription: StripeSDK.Subscription = event.data.object as StripeSDK.Subscription; // Corrected type reference
+        let updatedUserId = subscription.metadata.supabase_user_id;
 
         if (!updatedUserId) {
           console.warn('Subscription updated/deleted event missing supabase_user_id in metadata:', subscription);

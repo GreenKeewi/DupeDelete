@@ -53,22 +53,27 @@ export async function POST(req: Request) {
     // Create a temporary directory for this job
     const jobId = path.basename(await createTempDir()); // Use the generated UUID as jobId
     extractedDirPath = path.join(await createTempDir(jobId + '-extracted-')); // Create a dedicated extracted dir for this job
+    console.log(`[Upload API] Job ID: ${jobId}, Extracted Dir: ${extractedDirPath}`); // Added logging
 
     // Save the uploaded zip file temporarily
     tempZipPath = path.join(extractedDirPath, file.name); // Store zip inside the job's extracted dir
     const buffer = Buffer.from(await file.arrayBuffer());
     await fsp.writeFile(tempZipPath, buffer);
+    console.log(`[Upload API] Zip file saved to: ${tempZipPath}`); // Added logging
 
     // Extract the zip file
     await fs.createReadStream(tempZipPath)
       .pipe(unzipper.Extract({ path: extractedDirPath }))
       .promise();
+    console.log(`[Upload API] Zip file extracted to: ${extractedDirPath}`); // Added logging
 
     // Get all files from the extracted directory
     const allFilePaths = await getFilesInDir(extractedDirPath);
+    console.log(`[Upload API] All files found in extracted dir (${allFilePaths.length}):`, allFilePaths); // Added logging
 
     // Filter out the original zip file from the list of files to scan
     const filesToScan = allFilePaths.filter(p => p !== tempZipPath);
+    console.log(`[Upload API] Files to scan after filtering zip (${filesToScan.length}):`, filesToScan); // Added logging
 
     // Enforce the 100-file limit
     if (filesToScan.length > 100) {
@@ -88,8 +93,10 @@ export async function POST(req: Request) {
         size: stats.size,
       };
     }));
+    console.log(`[Upload API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`, filesWithRelativePaths); // Added logging
 
     const backendDuplicateGroups: BackendDuplicateGroup[] = await scanFilesForDuplicates(filesWithRelativePaths);
+    console.log(`[Upload API] Duplicate groups found by backend (${backendDuplicateGroups.length}):`, backendDuplicateGroups); // Added logging
 
     // Format the duplicate groups for the frontend
     const frontendDuplicates: FrontendDuplicateFile[] = [];

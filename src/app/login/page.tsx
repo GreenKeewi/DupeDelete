@@ -4,24 +4,14 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react'; // Import useEffect for client-side check
-import { toast } from 'sonner'; // Import toast for user feedback
+// Removed useEffect and toast imports as NEXT_PUBLIC_BASE_URL is now set.
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect_to') || '/pricing';
 
-  // Client-side check for NEXT_PUBLIC_BASE_URL
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_BASE_URL) {
-      toast.error("NEXT_PUBLIC_BASE_URL is not set. Please configure it in your environment variables (e.g., .env.local).", {
-        duration: 8000,
-      });
-      console.error("Environment variable NEXT_PUBLIC_BASE_URL is not set.");
-    }
-  }, []);
-
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'; // Fallback for development
+  // NEXT_PUBLIC_BASE_URL is now expected to be set in the environment.
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL!; 
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">

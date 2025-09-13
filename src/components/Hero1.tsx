@@ -45,8 +45,8 @@ export const Hero1 = () => {
                 Clean up to 100 images free
               </Button>
             </Link>
-            <Link href="/pricing" className="w-full sm:w-auto">
-              <Button href="/#pricing-section" onClick={(e) => handleScrollToSection(e, 'pricing-section')}
+            <Link href="/#pricing-section" onClick={(e) => handleScrollToSection(e, 'pricing-section')} className="w-full sm:w-auto">
+              <Button 
                 size="lg" 
                 className="gap-4 w-full 
                            sm:px-4 sm:py-2 sm:text-sm 

@@ -1,33 +1,43 @@
-import {
-  ComprehensiveScanResult,
-  DetectionConfig,
-  DuplicateGroup,
-  FileType,
-  ScannedFile,
-  SimilarImageGroup,
-} from "@/types/detection"; // Import types
-import { createHash } from "crypto";
-import { promises as fs } from "fs";
-import imageHash from "image-hash";
-import { Jimp } from "jimp";
-import path from "path";
-import { ssim } from "ssim.js";
-import { v4 as uuidv4 } from "uuid";
-import { isBrokenImage, isZeroByteFile } from "./file-validation";
+import { createHash } from 'crypto';
+import { promises as fs } from 'fs';
+import path from 'path';
+import imageHash from 'image-hash';
+import { v4 as uuidv4 } from 'uuid';
+import { Jimp } from 'jimp';
+import { ssim } from 'ssim.js';
 
-const IMAGE_EXTENSIONS = [
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".bmp",
-  ".webp",
-  ".tiff",
-  ".tif",
-];
-const DEFAULT_SIMILARITY_THRESHOLD = 5;
-const DEFAULT_SSIM_THRESHOLD = 0.9;
-const DEFAULT_NORMALIZED_SIZE = 256;
+export type FileType = 'image' | 'other';
+
+export interface ScannedFile {
+  id: string;
+  fileName: string;
+  relativePath: string; // Path relative to the extracted folder root
+  fullPath: string; // Absolute path on the server
+  type: FileType;
+  md5Hash: string; // New: MD5 hash for exact comparison
+  pHash?: string; // Perceptual hash (optional, only for images)
+  size: number;
+  detectionMethod?: 'MD5' | 'pHash' | 'SSIM'; // New: How it was detected as a duplicate
+}
+
+export interface DuplicateGroup {
+  hash: string; // The primary hash (MD5 or pHash) of the original file in the group
+  original: ScannedFile;
+  duplicates: ScannedFile[];
+  detectionMethod: 'MD5' | 'pHash' | 'SSIM'; // New: How this group was formed
+}
+
+// Export DetectionConfig interface
+export interface DetectionConfig {
+  similarityThreshold?: number; // For pHash Hamming distance
+  ssimThreshold?: number;     // For SSIM similarity
+  normalizedSize?: number;    // For image resizing before SSIM
+}
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+const DEFAULT_SIMILARITY_THRESHOLD = 5; // Default Hamming distance threshold for image similarity (pHash)
+const DEFAULT_SSIM_THRESHOLD = 0.90; // Default SSIM similarity threshold
+const DEFAULT_NORMALIZED_SIZE = 256; // Default image normalization size for SSIM
 
 function isImageFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
@@ -36,46 +46,38 @@ function isImageFile(filePath: string): boolean {
 
 async function getMd5Hash(filePath: string): Promise<string> {
   const fileBuffer = await fs.readFile(filePath);
-  return createHash("md5").update(fileBuffer).digest("hex");
+  return createHash('md5').update(fileBuffer).digest('hex');
+}
+
+async function getSha256Hash(filePath: string): Promise<string> {
+  const fileBuffer = await fs.readFile(filePath);
+  return createHash('sha256').update(fileBuffer).digest('hex');
 }
 
 async function getPerceptualHash(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    try {
-      imageHash(
-        {
-          path: filePath,
-          mode: "blockhash",
-          bits: 16,
-        },
-        (error: Error | null, data: string) => {
-          if (error) {
-            console.error(
-              `Error generating perceptual hash for ${filePath}:`,
-              error
-            );
-            resolve("");
-          } else {
-            resolve(data);
-          }
-        }
-      );
-    } catch (error) {
-      console.error(
-        `Error initializing perceptual hash for ${filePath}:`,
-        error
-      );
-      resolve("");
-    }
+    imageHash({
+      path: filePath,
+      mode: 'blockhash', // Using blockhash for perceptual hashing
+      bits: 16 // Generates a 64-bit hash (16 hex characters)
+    }, (error: Error | null, data: string) => {
+      if (error) {
+        console.error(`Error generating perceptual hash for ${filePath}:`, error);
+        getSha256Hash(filePath).then(resolve).catch(reject);
+      } else {
+        resolve(data);
+      }
+    });
   });
 }
 
 function hexToBinary(hexChar: string): string {
-  return parseInt(hexChar, 16).toString(2).padStart(4, "0");
+  return parseInt(hexChar, 16).toString(2).padStart(4, '0');
 }
 
 function getHammingDistance(hash1: string, hash2: string): number {
-  if (hash1.length !== hash2.length || !hash1 || !hash2) {
+  if (hash1.length !== hash2.length) {
+    console.warn("Hashes have different lengths, cannot calculate Hamming distance accurately.");
     return Infinity;
   }
 
@@ -92,32 +94,13 @@ function getHammingDistance(hash1: string, hash2: string): number {
   return distance;
 }
 
-async function getSsimSimilarity(
-  imagePath1: string,
-  imagePath2: string,
-  normalizedSize: number
-): Promise<number> {
+async function getSsimSimilarity(imagePath1: string, imagePath2: string, normalizedSize: number): Promise<number> {
   try {
-    console.log(
-      `[SSIM] Starting SSIM calculation for ${imagePath1} and ${imagePath2}`
-    );
-
     const img1 = await (Jimp as any).read(imagePath1);
     const img2 = await (Jimp as any).read(imagePath2);
 
-    console.log(
-      `[SSIM] Images loaded successfully, resizing to ${normalizedSize}x${normalizedSize}`
-    );
-    img1.resize(
-      normalizedSize,
-      normalizedSize,
-      (Jimp as any).constants.RESIZE_BICUBIC
-    );
-    img2.resize(
-      normalizedSize,
-      normalizedSize,
-      (Jimp as any).constants.RESIZE_BICUBIC
-    );
+    img1.resize(normalizedSize, normalizedSize, (Jimp as any).constants.RESIZE_BICUBIC);
+    img2.resize(normalizedSize, normalizedSize, (Jimp as any).constants.RESIZE_BICUBIC);
 
     const data1 = {
       data: new Uint8ClampedArray(img1.bitmap.data),
@@ -130,89 +113,48 @@ async function getSsimSimilarity(
       height: img2.bitmap.height,
     };
 
-    console.log(`[SSIM] Calculating SSIM similarity...`);
     const { mssim } = ssim(data1, data2, {
       windowSize: 11,
       k1: 0.01,
       k2: 0.03,
     });
-
-    console.log(`[SSIM] SSIM similarity calculated: ${mssim}`);
     return mssim;
   } catch (error) {
-    console.error(
-      `[SSIM] Error calculating SSIM for ${imagePath1} and ${imagePath2}:`,
-      error
-    );
-    console.error(`[SSIM] Error details:`, (error as Error).message);
+    console.error(`Error calculating SSIM for ${imagePath1} and ${imagePath2}:`, error);
     return 0;
   }
 }
 
-export async function performComprehensiveScan(
-  jobId: string,
+export async function scanFilesForDuplicates(
   files: { fullPath: string; relativePath: string; size: number }[],
-  config?: DetectionConfig
-): Promise<ComprehensiveScanResult> {
-  console.log(
-    `[Scan] Starting comprehensive scan for job ${jobId} with ${files.length} files`
-  );
-
+  config?: DetectionConfig // Added optional config parameter
+): Promise<DuplicateGroup[]> {
   const allScannedFiles: ScannedFile[] = [];
-  const brokenFiles: ScannedFile[] = [];
-  const validFiles: ScannedFile[] = [];
+  const duplicateGroups: DuplicateGroup[] = [];
+  const processedFileIds = new Set<string>();
 
-  const currentSimilarityThreshold =
-    config?.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
+  // Use provided config values or fall back to defaults
+  const currentSimilarityThreshold = config?.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
   const currentSsimThreshold = config?.ssimThreshold ?? DEFAULT_SSIM_THRESHOLD;
-  const currentNormalizedSize =
-    config?.normalizedSize ?? DEFAULT_NORMALIZED_SIZE;
+  const currentNormalizedSize = config?.normalizedSize ?? DEFAULT_NORMALIZED_SIZE;
 
-  console.log(
-    `[Scan] Using config: similarityThreshold=${currentSimilarityThreshold}, ssimThreshold=${currentSsimThreshold}, normalizedSize=${currentNormalizedSize}`
-  );
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    console.log(
-      `[Scan] Processing file ${i + 1}/${files.length}: ${file.relativePath}`
-    );
-
-    const fileType: FileType = isImageFile(file.fullPath) ? "image" : "other";
-    let md5Hash: string = "";
+  // --- Pass 1: Initial scan and hashing (MD5 for all, pHash for images) ---
+  for (const file of files) {
+    const fileType: FileType = isImageFile(file.fullPath) ? 'image' : 'other';
+    let md5Hash: string;
     let pHash: string | undefined;
-    let isFileBroken = false;
 
     try {
-      if (await isZeroByteFile(file.fullPath)) {
-        isFileBroken = true;
-        console.warn(`[Scan] Zero-byte file detected: ${file.fullPath}`);
-      } else if (fileType === "image") {
-        if (await isBrokenImage(file.fullPath)) {
-          isFileBroken = true;
-          console.warn(`[Scan] Broken image detected: ${file.fullPath}`);
-        }
-      }
-
-      if (!isFileBroken) {
-        console.log(`[Scan] Generating MD5 hash for: ${file.relativePath}`);
-        md5Hash = await getMd5Hash(file.fullPath);
-        if (fileType === "image") {
-          console.log(
-            `[Scan] Generating perceptual hash for: ${file.relativePath}`
-          );
-          pHash = await getPerceptualHash(file.fullPath);
-        }
+      md5Hash = await getMd5Hash(file.fullPath);
+      if (fileType === 'image') {
+        pHash = await getPerceptualHash(file.fullPath);
       }
     } catch (error) {
-      console.warn(
-        `[Scan] Could not process file ${file.fullPath}. Marking as broken.`,
-        error
-      );
-      isFileBroken = true;
+      console.warn(`Could not hash file ${file.fullPath}. Skipping.`, error);
+      continue;
     }
 
-    const scannedFile: ScannedFile = {
+    allScannedFiles.push({
       id: uuidv4(),
       fileName: path.basename(file.fullPath),
       relativePath: file.relativePath,
@@ -221,27 +163,12 @@ export async function performComprehensiveScan(
       md5Hash,
       pHash,
       size: file.size,
-      isBroken: isFileBroken,
-    };
-    allScannedFiles.push(scannedFile);
-
-    if (isFileBroken) {
-      brokenFiles.push(scannedFile);
-    } else {
-      validFiles.push(scannedFile);
-    }
+    });
   }
 
-  const duplicates: DuplicateGroup[] = [];
-  const similarImages: SimilarImageGroup[] = [];
-  const processedFileIds = new Set<string>(brokenFiles.map((f) => f.id));
-
-  let md5DuplicatesCount = 0;
-  let pHashSimilarCount = 0;
-  let ssimSimilarCount = 0;
-
+  // --- Pass 2: Find MD5 duplicates (exact match for all file types) ---
   const md5Map = new Map<string, ScannedFile[]>();
-  for (const file of validFiles) {
+  for (const file of allScannedFiles) {
     if (!processedFileIds.has(file.id)) {
       const group = md5Map.get(file.md5Hash) || [];
       group.push(file);
@@ -252,34 +179,32 @@ export async function performComprehensiveScan(
   for (const [hash, groupFiles] of md5Map.entries()) {
     if (groupFiles.length > 1) {
       const original = groupFiles[0];
-      const currentDuplicates = groupFiles.slice(1);
-      duplicates.push({
+      const duplicates = groupFiles.slice(1);
+      duplicateGroups.push({
         hash: original.md5Hash,
         original,
-        duplicates: currentDuplicates.map((d) => ({
-          ...d,
-          detectionMethod: "MD5",
-        })),
-        detectionMethod: "MD5",
+        duplicates: duplicates.map(d => ({ ...d, detectionMethod: 'MD5' })),
+        detectionMethod: 'MD5',
       });
-      groupFiles.forEach((f) => processedFileIds.add(f.id));
-      md5DuplicatesCount += currentDuplicates.length;
+      groupFiles.forEach(f => processedFileIds.add(f.id));
     }
   }
 
-  const remainingImageFilesForPHash = validFiles.filter(
-    (f) => !processedFileIds.has(f.id) && f.type === "image" && f.pHash
+  // --- Pass 3: Find pHash duplicates for remaining image files ---
+  const remainingImageFilesForPHash = allScannedFiles.filter(
+    (f) => !processedFileIds.has(f.id) && f.type === 'image'
   );
 
+  const pHashGroups: { original: ScannedFile; duplicates: ScannedFile[] }[] = [];
   const pHashProcessedIdsInPass = new Set<string>();
 
   for (let i = 0; i < remainingImageFilesForPHash.length; i++) {
     const currentFile = remainingImageFilesForPHash[i];
     if (pHashProcessedIdsInPass.has(currentFile.id)) continue;
 
-    let currentGroup: { original: ScannedFile; similar: ScannedFile[] } = {
+    let currentGroup: { original: ScannedFile; duplicates: ScannedFile[] } = {
       original: currentFile,
-      similar: [],
+      duplicates: [],
     };
     pHashProcessedIdsInPass.add(currentFile.id);
 
@@ -288,35 +213,34 @@ export async function performComprehensiveScan(
       if (pHashProcessedIdsInPass.has(compareFile.id)) continue;
 
       if (currentFile.pHash && compareFile.pHash) {
-        const distance = getHammingDistance(
-          currentFile.pHash,
-          compareFile.pHash
-        );
-        if (distance <= currentSimilarityThreshold) {
-          currentGroup.similar.push(compareFile);
+        const distance = getHammingDistance(currentFile.pHash, compareFile.pHash);
+        if (distance <= currentSimilarityThreshold) { // Use currentSimilarityThreshold
+          currentGroup.duplicates.push(compareFile);
           pHashProcessedIdsInPass.add(compareFile.id);
         }
       }
     }
 
-    if (currentGroup.similar.length > 0) {
-      similarImages.push({
-        hash: currentGroup.original.pHash!,
-        original: currentGroup.original,
-        similar: currentGroup.similar.map((s) => ({
-          ...s,
-          detectionMethod: "pHash",
-        })),
-        detectionMethod: "pHash",
-      });
-      processedFileIds.add(currentGroup.original.id);
-      currentGroup.similar.forEach((f) => processedFileIds.add(f.id));
-      pHashSimilarCount += currentGroup.similar.length;
+    if (currentGroup.duplicates.length > 0) {
+      pHashGroups.push(currentGroup);
+      currentGroup.duplicates.forEach(f => pHashProcessedIdsInPass.add(f.id));
     }
   }
 
-  const remainingImageFilesForSSIM = validFiles.filter(
-    (f) => !processedFileIds.has(f.id) && f.type === "image"
+  for (const group of pHashGroups) {
+    duplicateGroups.push({
+      hash: group.original.pHash!,
+      original: group.original,
+      duplicates: group.duplicates.map(d => ({ ...d, detectionMethod: 'pHash' })),
+      detectionMethod: 'pHash',
+    });
+    processedFileIds.add(group.original.id);
+    group.duplicates.forEach(f => processedFileIds.add(f.id));
+  }
+
+  // --- Pass 4: Find SSIM duplicates for remaining image files ---
+  const remainingImageFilesForSSIM = allScannedFiles.filter(
+    (f) => !processedFileIds.has(f.id) && f.type === 'image'
   );
 
   const ssimProcessedIdsInPass = new Set<string>();
@@ -324,9 +248,9 @@ export async function performComprehensiveScan(
     const currentFile = remainingImageFilesForSSIM[i];
     if (ssimProcessedIdsInPass.has(currentFile.id)) continue;
 
-    let ssimGroup: { original: ScannedFile; similar: ScannedFile[] } = {
+    let ssimGroup: { original: ScannedFile; duplicates: ScannedFile[] } = {
       original: currentFile,
-      similar: [],
+      duplicates: [],
     };
     ssimProcessedIdsInPass.add(currentFile.id);
 
@@ -334,46 +258,24 @@ export async function performComprehensiveScan(
       const compareFile = remainingImageFilesForSSIM[j];
       if (ssimProcessedIdsInPass.has(compareFile.id)) continue;
 
-      const similarity = await getSsimSimilarity(
-        currentFile.fullPath,
-        compareFile.fullPath,
-        currentNormalizedSize
-      );
-      if (similarity >= currentSsimThreshold) {
-        ssimGroup.similar.push(compareFile);
+      const similarity = await getSsimSimilarity(currentFile.fullPath, compareFile.fullPath, currentNormalizedSize); // Pass normalizedSize
+      if (similarity >= currentSsimThreshold) { // Use currentSsimThreshold
+        ssimGroup.duplicates.push(compareFile);
         ssimProcessedIdsInPass.add(compareFile.id);
       }
     }
 
-    if (ssimGroup.similar.length > 0) {
-      similarImages.push({
+    if (ssimGroup.duplicates.length > 0) {
+      duplicateGroups.push({
         hash: currentFile.md5Hash,
         original: currentFile,
-        similar: ssimGroup.similar.map((s) => ({
-          ...s,
-          detectionMethod: "SSIM",
-        })),
-        detectionMethod: "SSIM",
+        duplicates: ssimGroup.duplicates.map(d => ({ ...d, detectionMethod: 'SSIM' })),
+        detectionMethod: 'SSIM',
       });
       processedFileIds.add(currentFile.id);
-      ssimGroup.similar.forEach((f) => processedFileIds.add(f.id));
-      ssimSimilarCount += ssimGroup.similar.length;
+      ssimGroup.duplicates.forEach(f => processedFileIds.add(f.id));
     }
   }
 
-  return {
-    jobId,
-    duplicates,
-    similarImages,
-    brokenFiles,
-    totalFilesScanned: allScannedFiles.length,
-    summary: {
-      totalDuplicates: md5DuplicatesCount,
-      totalSimilarImages: pHashSimilarCount + ssimSimilarCount,
-      totalBrokenFiles: brokenFiles.length,
-      md5Duplicates: md5DuplicatesCount,
-      pHashSimilar: pHashSimilarCount,
-      ssimSimilar: ssimSimilarCount,
-    },
-  };
+  return duplicateGroups;
 }

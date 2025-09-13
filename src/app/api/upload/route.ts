@@ -4,7 +4,9 @@ import * as fs from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
 import { createTempDir, cleanupTempDir, getFilesInDir } from '@/lib/file-utils';
-import { scanFilesForDuplicates, DetectionConfig } from '@/lib/duplicate-detection';
+import { scanFilesForDuplicates, DuplicateGroup as BackendDuplicateGroup, ScannedFile, DetectionConfig } from '@/lib/duplicate-detection';
+
+// Declare module for unzipper is now in src/types/unzipper.d.ts
 
 // Set the maximum file size for uploads (e.g., 1GB)
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
@@ -14,6 +16,15 @@ export const config = {
     bodyParser: false, // Disable Next.js body parser to handle file streams
   },
 };
+
+// Define the structure for files sent to the frontend
+interface FrontendDuplicateFile {
+  id: string;
+  fileName: string;
+  relativePath: string; // Path relative to the extracted folder root
+  type: "image" | "other";
+  originalFileId?: string; // Link to its original for comparison
+}
 
 export async function POST(req: Request) {
   if (req.method !== 'POST') {
@@ -53,27 +64,27 @@ export async function POST(req: Request) {
     // Create a temporary directory for this job
     const jobId = path.basename(await createTempDir()); // Use the generated UUID as jobId
     extractedDirPath = path.join(await createTempDir(jobId + '-extracted-')); // Create a dedicated extracted dir for this job
-    console.log(`[Detect Duplicates API] Job ID: ${jobId}, Extracted Dir: ${extractedDirPath}`);
+    console.log(`[Upload API] Job ID: ${jobId}, Extracted Dir: ${extractedDirPath}`); // Added logging
 
     // Save the uploaded zip file temporarily
     tempZipPath = path.join(extractedDirPath, file.name); // Store zip inside the job's extracted dir
     const buffer = Buffer.from(await file.arrayBuffer());
     await fsp.writeFile(tempZipPath, buffer);
-    console.log(`[Detect Duplicates API] Zip file saved to: ${tempZipPath}`);
+    console.log(`[Upload API] Zip file saved to: ${tempZipPath}`); // Added logging
 
     // Extract the zip file
     await fs.createReadStream(tempZipPath)
       .pipe(unzipper.Extract({ path: extractedDirPath }))
       .promise();
-    console.log(`[Detect Duplicates API] Zip file extracted to: ${extractedDirPath}`);
+    console.log(`[Upload API] Zip file extracted to: ${extractedDirPath}`); // Added logging
 
     // Get all files from the extracted directory
     const allFilePaths = await getFilesInDir(extractedDirPath);
-    console.log(`[Detect Duplicates API] All files found in extracted dir (${allFilePaths.length}):`, allFilePaths);
+    console.log(`[Upload API] All files found in extracted dir (${allFilePaths.length}):`, allFilePaths); // Added logging
 
     // Filter out the original zip file from the list of files to scan
     const filesToScan = allFilePaths.filter(p => p !== tempZipPath);
-    console.log(`[Detect Duplicates API] Files to scan after filtering zip (${filesToScan.length}):`, filesToScan);
+    console.log(`[Upload API] Files to scan after filtering zip (${filesToScan.length}):`, filesToScan); // Added logging
 
     // Enforce the 100-file limit
     if (filesToScan.length > 100) {
@@ -93,37 +104,50 @@ export async function POST(req: Request) {
         size: stats.size,
       };
     }));
-    console.log(`[Detect Duplicates API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`, filesWithRelativePaths);
+    console.log(`[Upload API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`, filesWithRelativePaths); // Added logging
 
-    // Run duplicate detection with configurable parameters
-    const duplicateGroups = await scanFilesForDuplicates(filesWithRelativePaths, detectionConfig);
-    console.log(`[Detect Duplicates API] Duplicate groups found (${duplicateGroups.length}):`, duplicateGroups);
+    const backendDuplicateGroups: BackendDuplicateGroup[] = await scanFilesForDuplicates(filesWithRelativePaths, detectionConfig);
+    console.log(`[Upload API] Duplicate groups found by backend (${backendDuplicateGroups.length}):`, backendDuplicateGroups); // Added logging
+
+    // Format the duplicate groups for the frontend
+    const frontendDuplicates: FrontendDuplicateFile[] = [];
+    const allScannedFilesForFrontend: ScannedFile[] = []; // To store all scanned files for frontend lookup
+
+    // Collect all scanned files first
+    for (const group of backendDuplicateGroups) {
+      allScannedFilesForFrontend.push(group.original);
+      group.duplicates.forEach(dup => allScannedFilesForFrontend.push(dup));
+    }
+    // Add any unique files that weren't part of a duplicate group
+    const uniqueFiles = filesWithRelativePaths.filter(f => !allScannedFilesForFrontend.some(s => s.fullPath === f.fullPath));
+    for (const file of uniqueFiles) {
+      // Re-hash to get the ScannedFile structure, or just create a minimal one
+      // For simplicity, we'll just add the ones that are part of a group or are originals.
+      // The frontend's `uploadedFiles` state will hold all initial files.
+    }
+
+
+    // Now, populate frontendDuplicates
+    for (const group of backendDuplicateGroups) {
+      group.duplicates.forEach(dup => {
+        frontendDuplicates.push({
+          id: dup.id,
+          fileName: dup.fileName,
+          relativePath: dup.relativePath,
+          type: dup.type,
+          originalFileId: group.original.id, // Link to the original file's ID
+        });
+      });
+    }
 
     // Clean up the temporary zip file, but keep the extracted directory for cleanup process
     if (tempZipPath) {
       await fsp.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err));
     }
 
-    // Return the duplicate groups with metadata
-    return NextResponse.json({
-      jobId,
-      duplicateGroups,
-      totalFiles: filesWithRelativePaths.length,
-      duplicateCount: duplicateGroups.reduce((sum, group) => sum + group.duplicates.length, 0),
-      detectionConfig: {
-        similarityThreshold: detectionConfig.similarityThreshold || 5,
-        ssimThreshold: detectionConfig.ssimThreshold || 0.90,
-        normalizedSize: detectionConfig.normalizedSize || 512,
-      },
-      summary: {
-        md5Duplicates: duplicateGroups.filter(g => g.detectionMethod === 'MD5').length,
-        pHashDuplicates: duplicateGroups.filter(g => g.detectionMethod === 'pHash').length,
-        ssimDuplicates: duplicateGroups.filter(g => g.detectionMethod === 'SSIM').length,
-      }
-    });
-
+    return NextResponse.json({ jobId, duplicateGroups: frontendDuplicates, allScannedFiles: allScannedFilesForFrontend });
   } catch (error) {
-    console.error('Error processing duplicate detection:', error);
+    console.error('Error processing upload:', error);
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }

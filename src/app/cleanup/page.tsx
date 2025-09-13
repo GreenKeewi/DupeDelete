@@ -10,6 +10,8 @@ import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
 import { ScannedFile } from "@/lib/duplicate-detection"; // Import ScannedFile type from backend
 import JSZip from "jszip"; // Import JSZip
+import { useSession } from "@/components/SessionContextProvider"; // Import useSession
+import { useSubscription } from "@/hooks/use-subscription"; // Import useSubscription
 
 interface FrontendDuplicateFile {
   id: string;
@@ -21,6 +23,8 @@ interface FrontendDuplicateFile {
   detectionMethod?: 'MD5' | 'pHash' | 'SSIM'; // New: How it was detected
 }
 
+const FREE_FILE_LIMIT = 100;
+
 export default function CleanupPage() {
   const [uploadedFiles, setUploadedFiles] = useState<ScannedFile[]>([]); // Store all scanned files from backend
   const [duplicates, setDuplicates] = useState<FrontendDuplicateFile[]>([]); // Store only the duplicate entries for display
@@ -29,6 +33,10 @@ export default function CleanupPage() {
   const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const router = useRouter();
+  const { user, isLoading: isSessionLoading } = useSession(); // Get user and session loading state
+  const { isPro, isBasic, isLoading: isSubscriptionLoading } = useSubscription(); // Get subscription status
+
+  const isPremiumUser = isPro || isBasic; // A user is premium if they have a Pro or Basic plan
 
   // Clean up object URLs when component unmounts or uploadedFiles change
   useEffect(() => {
@@ -50,10 +58,15 @@ export default function CleanupPage() {
       return;
     }
 
-    // The 100-file limit is now enforced on the backend, but a client-side check can provide faster feedback
-    if (filesArray.length > 100) {
-      toast.warning("You've reached the free limit. Redirecting to upgrade options.");
-      router.push("/pricing");
+    // Enforce the 100-file limit for free users
+    if (!isPremiumUser && filesArray.length > FREE_FILE_LIMIT) {
+      toast.warning(`You've reached the free limit of ${FREE_FILE_LIMIT} files. Please upgrade for unlimited cleaning.`, { id: "file-limit" });
+      // If not logged in, redirect to login, otherwise to pricing
+      if (!user) {
+        router.push(`/login?redirect_to=${encodeURIComponent('/pricing')}`);
+      } else {
+        router.push("/pricing");
+      }
       return;
     }
 
@@ -225,8 +238,11 @@ export default function CleanupPage() {
             multiple
             onChange={handleUpload}
             className="hidden"
+            disabled={isProcessing || isSessionLoading || isSubscriptionLoading}
           />
-          <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
+          <p className="text-sm text-muted-foreground">
+            {isPremiumUser ? "Unlimited file cleaning" : `Free limit: ${FREE_FILE_LIMIT} files`}
+          </p>
           {uploadedFiles.length > 0 && (
             <p className="text-sm text-primary">
               {uploadedFiles.length} files selected.
@@ -250,8 +266,8 @@ export default function CleanupPage() {
           </Button>
 
           <div className="h-64 border rounded-md overflow-auto p-4 bg-background">
-            {isProcessing ? (
-              <p className="text-center text-muted-foreground">Scanning for duplicate images...</p>
+            {isProcessing || isSessionLoading || isSubscriptionLoading ? (
+              <p className="text-center text-muted-foreground">Loading subscription and scanning for duplicate images...</p>
             ) : duplicates.length === 0 ? (
               <p className="text-center text-muted-foreground">No duplicate images found. Upload a folder to start.</p>
             ) : (

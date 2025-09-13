@@ -27,6 +27,7 @@ export default function CleanupPage() {
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
   const [selectedForComparison, setSelectedForComparison] = useState<{ original: DisplayFile; duplicate: DisplayFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [selectedFileCount, setSelectedFileCount] = useState(0); // New state for selected file count
   const router = useRouter();
 
   useEffect(() => {
@@ -43,14 +44,18 @@ export default function CleanupPage() {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
 
+    setSelectedFileCount(filesArray.length); // Update selected file count immediately
+
     if (filesArray.length === 0) {
       toast.info("No files selected.");
+      setSelectedFileCount(0); // Reset if no files
       return;
     }
 
     if (filesArray.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
       router.push("/pricing");
+      setSelectedFileCount(0); // Reset if over limit
       return;
     }
 
@@ -76,6 +81,7 @@ export default function CleanupPage() {
       console.error("Error zipping files:", zipError);
       toast.error("Failed to zip files for upload.", { id: "upload-scan" });
       setIsProcessing(false);
+      setSelectedFileCount(0); // Reset on error
       return;
     }
 
@@ -115,6 +121,7 @@ export default function CleanupPage() {
       toast.success("Scan complete! Review results below.", { id: "upload-scan" });
     } catch (error: any) {
       console.error("Upload error:", error);
+      setSelectedFileCount(0); // Reset on error
     } finally {
       setIsProcessing(false);
     }
@@ -297,9 +304,9 @@ export default function CleanupPage() {
             disabled={isProcessing} // Disable input during processing
           />
           <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
-          {allScannedFiles.length > 0 && (
+          {selectedFileCount > 0 && ( // Display selectedFileCount here
             <p className="text-sm text-primary">
-              {allScannedFiles.length} files selected.
+              {selectedFileCount} files selected.
             </p>
           )}
           {isProcessing && (

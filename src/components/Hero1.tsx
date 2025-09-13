@@ -46,7 +46,7 @@ export const Hero1 = () => {
               </Button>
             </Link>
             <Link href="/pricing" className="w-full sm:w-auto">
-              <Button 
+              <Button href="/#pricing-section" onClick={(e) => handleScrollToSection(e, 'pricing-section')}
                 size="lg" 
                 className="gap-4 w-full 
                            sm:px-4 sm:py-2 sm:text-sm 

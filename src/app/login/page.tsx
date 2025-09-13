@@ -1,12 +1,13 @@
-"use client"; // Added "use client" directive as this component uses hooks and client-side features.
+"use client";
 
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { supabase } from '@/integrations/supabase/client'; // Corrected import to use 'supabase'
+import { supabase } from '@/integrations/supabase/client';
+import { useSearchParams } from 'next/navigation'; // Import useSearchParams
 
 export default function LoginPage() {
-  // The supabase client is already initialized and exported from '@/integrations/supabase/client'
-  // No need to call createClient() again here.
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect_to') || '/pricing'; // Default to /pricing if no redirect_to is specified
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -14,7 +15,7 @@ export default function LoginPage() {
         <h2 className="text-2xl font-bold text-center text-foreground">Welcome to DupeDelete</h2>
         <Auth
           supabaseClient={supabase}
-          providers={[]} // No third-party providers for now
+          providers={[]}
           appearance={{
             theme: ThemeSupa,
             variables: {
@@ -27,7 +28,7 @@ export default function LoginPage() {
             },
           }}
           theme="light"
-          redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard`} // Redirect after successful login
+          redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}${redirectTo}`} // Use the dynamic redirectTo URL
         />
       </div>
     </div>

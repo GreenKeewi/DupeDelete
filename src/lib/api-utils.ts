@@ -4,6 +4,16 @@ interface FetcherOptions extends RequestInit {
   errorMessage?: string;
 }
 
+// Define a generic API response structure
+interface ApiResponse<T> {
+  success: boolean;
+  error?: string;
+  message?: string; // For general messages, not necessarily errors
+  data?: T; // The actual data if success is true
+  // Allow for other properties like jobId, duplicates, etc.
+  [key: string]: any; 
+}
+
 export async function apiFetcher<T>(url: string, options?: FetcherOptions): Promise<T> {
   const { errorMessage = "An unexpected error occurred.", ...fetchOptions } = options || {};
 
@@ -13,36 +23,43 @@ export async function apiFetcher<T>(url: string, options?: FetcherOptions): Prom
     const contentType = response.headers.get("Content-Type");
     const isJson = contentType?.includes("application/json");
 
-    if (!response.ok) {
-      let errorData: any;
-      if (isJson) {
-        errorData = await response.json();
-        console.error(`API Error (${response.status}) from ${url}:`, errorData);
-        toast.error(errorData.message || errorMessage);
-        throw new Error(errorData.message || errorMessage);
-      } else {
-        const textResponse = await response.text();
-        console.error(`API Error (${response.status}) from ${url}: Non-JSON response received.`);
-        console.error("Raw response body (first 200 chars):", textResponse.substring(0, 200));
-        toast.error(`${errorMessage} (Status: ${response.status}). Received non-JSON response.`);
-        throw new Error(`${errorMessage} (Status: ${response.status}). Received non-JSON response. Body: ${textResponse.substring(0, 200)}...`);
-      }
-    }
+    let responseData: ApiResponse<T> | string;
 
     if (isJson) {
-      return await response.json() as T;
+      responseData = await response.json() as ApiResponse<T>;
     } else {
-      const textResponse = await response.text();
-      console.warn(`API Warning from ${url}: Expected JSON but received non-JSON (Content-Type: ${contentType}).`);
-      console.warn("Raw response body (first 200 chars):", textResponse.substring(0, 200));
-      // If it's a successful non-JSON response, we might just return it as text or throw if strict JSON is always expected.
-      // For this scenario, we'll throw as the user expects JSON.
-      toast.error(`${errorMessage}. Expected JSON, but received non-JSON response.`);
-      throw new Error(`${errorMessage}. Expected JSON, but received non-JSON response. Body: ${textResponse.substring(0, 200)}...`);
+      responseData = await response.text();
+      console.error(`API Error (${response.status}) from ${url}: Non-JSON response received.`);
+      console.error("Raw response body (first 200 chars):", (responseData as string).substring(0, 200));
+      toast.error(`${errorMessage} (Status: ${response.status}). Received non-JSON response.`);
+      throw new Error(`${errorMessage} (Status: ${response.status}). Received non-JSON response. Body: ${(responseData as string).substring(0, 200)}...`);
     }
+
+    // Check if the HTTP response itself was not OK
+    if (!response.ok) {
+      const errorMsg = (responseData as ApiResponse<T>).error || (responseData as ApiResponse<T>).message || errorMessage;
+      console.error(`API Error (${response.status}) from ${url}:`, responseData);
+      toast.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    // If HTTP response is OK, but the API's internal 'success' flag is false
+    if (typeof responseData === 'object' && 'success' in responseData && responseData.success === false) {
+      const errorMsg = responseData.error || responseData.message || errorMessage;
+      console.error(`API Logical Error from ${url}:`, responseData);
+      toast.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    // If everything is successful, return the full response data (which should contain T and other fields)
+    return responseData as T;
+
   } catch (error) {
     console.error(`Network or unexpected error calling ${url}:`, error);
-    toast.error(`Network error: ${errorMessage}`);
+    // Only show a generic network error if a more specific error hasn't been toasted already
+    if (!toast.promise) { // Check if a toast is already active from previous error handling
+      toast.error(`Network error: ${errorMessage}`);
+    }
     throw error; // Re-throw to propagate the error
   }
 }

@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import imageHash from 'image-hash';
 import { v4 as uuidv4 } from 'uuid';
-import * as Jimp from 'jimp'; // Corrected: Import Jimp as a namespace object
+import { Jimp } from 'jimp'; // Corrected: Import Jimp as a named export
 import { ssim } from 'ssim.js'; // Import ssim.js for SSIM comparison
 
 export type FileType = 'image' | 'other';
@@ -97,8 +97,8 @@ async function getSsimSimilarity(imagePath1: string, imagePath2: string): Promis
     // Resize images to a common smaller dimension for faster SSIM calculation
     // and to handle slight resolution differences.
     const commonSize = 256; // e.g., 256x256
-    img1.resize(commonSize, commonSize, Jimp.RESIZE_BICUBIC);
-    img2.resize(commonSize, commonSize, Jimp.RESIZE_BICUBIC);
+    img1.resize(commonSize, commonSize, "bicubic"); // Changed to string literal
+    img2.resize(commonSize, commonSize, "bicubic"); // Changed to string literal
 
     // Convert to raw pixel data for ssim.js
     // ssim.js expects Uint8ClampedArray for ImageData.data

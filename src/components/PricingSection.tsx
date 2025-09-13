@@ -44,7 +44,7 @@ export const PricingSection = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center">
+    <div id="pricing-section" className="flex flex-col items-center justify-center">
       <h1 className="text-4xl font-bold text-center mb-4">Choose Your Plan</h1>
       <p className="text-lg text-muted-foreground text-center mb-8 max-w-2xl">
         Unlock unlimited cleaning and advanced features with our flexible plans.

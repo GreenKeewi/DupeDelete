@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { buffer } from 'micro'; // Required to parse raw body
+
 import { supabase } from '@/integrations/supabase/client'; // Import Supabase client
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -15,7 +16,9 @@ export const config = {
 };
 
 export async function POST(req: Request) {
-  const buf = await buffer(req);
+  // Use req.text() for Next.js App Router to get the raw body
+  const rawBody = await req.text();
+  const buf = Buffer.from(rawBody); // Convert raw body string to Buffer
   const sig = req.headers.get('stripe-signature');
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -46,7 +49,7 @@ export async function POST(req: Request) {
       }
 
       // Retrieve the subscription to get current_period_end
-      const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
       // Update or create subscription in your database
       const { data, error } = await supabase
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
             stripe_subscription_id: subscriptionId,
             status: stripeSubscription.status,
             plan_id: planId,
-            current_period_end: new Date(stripeSubscription.current_period_end * 1000).toISOString(),
+            current_period_end: new Date((stripeSubscription as any).current_period_end * 1000).toISOString(),
           },
           { onConflict: 'stripe_subscription_id' } // Update if subscription_id already exists
         )
@@ -74,7 +77,7 @@ export async function POST(req: Request) {
 
     case 'invoice.payment_succeeded':
       const invoice = event.data.object as Stripe.Invoice;
-      const invoiceSubscriptionId = invoice.subscription as string;
+      const invoiceSubscriptionId = (invoice as any).subscription as string; // invoice.subscription is a string ID
 
       if (!invoiceSubscriptionId) {
         console.error('Missing subscription ID in invoice.payment_succeeded event:', invoice);
@@ -82,14 +85,14 @@ export async function POST(req: Request) {
       }
 
       // Retrieve the subscription to get current_period_end and status
-      const updatedStripeSubscription = await stripe.subscriptions.retrieve(invoiceSubscriptionId);
+      const updatedStripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(invoiceSubscriptionId);
 
       // Update subscription status and period end in your database
       const { data: updatedData, error: updateError } = await supabase
         .from('subscriptions')
         .update({
           status: updatedStripeSubscription.status,
-          current_period_end: new Date(updatedStripeSubscription.current_period_end * 1000).toISOString(),
+          current_period_end: new Date((updatedStripeSubscription as any).current_period_end * 1000).toISOString(),
         })
         .eq('stripe_subscription_id', invoiceSubscriptionId)
         .select()
@@ -104,13 +107,13 @@ export async function POST(req: Request) {
 
     case 'customer.subscription.deleted':
     case 'customer.subscription.updated':
-      const subscription = event.data.object as Stripe.Subscription;
+      const subscription = event.data.object as Stripe.Subscription; // This is already a Stripe.Subscription object
       // Update subscription status in your database
       const { data: subUpdateData, error: subUpdateError } = await supabase
         .from('subscriptions')
         .update({
           status: subscription.status,
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
         })
         .eq('stripe_subscription_id', subscription.id)
         .select()

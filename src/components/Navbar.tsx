@@ -12,7 +12,7 @@ import { ChevronDown } from "lucide-react";
 
 export const Navbar = () => {
   return (
-    <nav className="bg-background shadow-sm border-b border-border">
+    <nav className="bg-background shadow-sm border-b border-border sticky top-0 z-50">
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
         <div className="flex-1">
           <Link href="/" className="text-xl font-bold text-foreground">

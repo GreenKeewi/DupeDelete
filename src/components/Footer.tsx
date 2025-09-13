@@ -11,7 +11,6 @@ export const Footer = () => {
           Built with ❤️. Powered by Next.js + Stripe.
         </p>
         <p>&copy; {currentYear} DupeDelete. All rights reserved.</p>
-      
       </div>
     </footer>
   );

@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'; // Import dynamic for client-side rendering
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react'; // Import useEffect
 
 // Dynamically import Auth component with SSR disabled
 const DynamicAuth = dynamic(() =>
@@ -13,9 +14,19 @@ const DynamicAuth = dynamic(() =>
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect_to') || '/pricing';
+  const redirectToParam = searchParams.get('redirect_to') || '/pricing';
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL!; 
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL; // Removed '!' for safer access
+
+  // Construct the full redirect URL
+  const fullRedirectTo = baseUrl ? `${baseUrl}${redirectToParam}` : redirectToParam;
+
+  useEffect(() => {
+    console.log("Supabase Auth redirectTo URL:", fullRedirectTo);
+    if (!baseUrl) {
+      console.warn("NEXT_PUBLIC_BASE_URL is not set. Redirects might not work correctly.");
+    }
+  }, [fullRedirectTo, baseUrl]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -36,7 +47,7 @@ export default function LoginPage() {
             },
           }}
           theme="light"
-          redirectTo={`${baseUrl}${redirectTo}`}
+          redirectTo={fullRedirectTo}
         />
       </div>
     </div>

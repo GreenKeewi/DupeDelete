@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar"; // Import Navbar
 import { Footer } from "@/components/Footer"; // Import Footer
+import { SessionContextProvider } from "@/components/SessionContextProvider"; // Import SessionContextProvider
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,11 +30,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
-        <Navbar /> {/* Render Navbar here */}
-        <div className="flex-grow">
-          {children}
-        </div>
-        <Footer /> {/* Render Footer here */}
+        <SessionContextProvider> {/* Wrap the entire app with SessionContextProvider */}
+          <Navbar /> {/* Render Navbar here */}
+          <div className="flex-grow">
+            {children}
+          </div>
+          <Footer /> {/* Render Footer here */}
+        </SessionContextProvider>
       </body>
     </html>
   );

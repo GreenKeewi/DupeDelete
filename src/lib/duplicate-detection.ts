@@ -5,64 +5,13 @@ import imageHash from 'image-hash';
 import { v4 as uuidv4 } from 'uuid';
 import { Jimp } from 'jimp';
 import { ssim } from 'ssim.js';
-import { isBrokenImage, isZeroByteFile } from './file-validation'; // Import new validation functions
+import { isBrokenImage, isZeroByteFile } from './file-validation';
+import { FileType, ScannedFile, DuplicateGroup, SimilarImageGroup, DetectionConfig, ComprehensiveScanResult } from '@/types/detection'; // Import types
 
-export type FileType = 'image' | 'other';
-
-export interface ScannedFile {
-  id: string;
-  fileName: string;
-  relativePath: string; // Path relative to the extracted folder root
-  fullPath: string; // Absolute path on the server
-  type: FileType;
-  md5Hash: string; // MD5 hash for exact comparison
-  pHash?: string; // Perceptual hash (optional, only for images)
-  size: number;
-  isBroken?: boolean; // New: Flag for broken files
-  detectionMethod?: 'MD5' | 'pHash' | 'SSIM'; // How it was detected as a duplicate/similar
-}
-
-export interface DuplicateGroup {
-  hash: string; // The primary hash (MD5) of the original file in the group
-  original: ScannedFile;
-  duplicates: ScannedFile[];
-  detectionMethod: 'MD5'; // Always MD5 for exact duplicates
-}
-
-export interface SimilarImageGroup {
-  hash: string; // The primary hash (pHash or MD5 if SSIM) of the original file in the group
-  original: ScannedFile;
-  similar: ScannedFile[];
-  detectionMethod: 'pHash' | 'SSIM'; // How this group was formed
-}
-
-// Export DetectionConfig interface
-export interface DetectionConfig {
-  similarityThreshold?: number; // For pHash Hamming distance
-  ssimThreshold?: number;     // For SSIM similarity
-  normalizedSize?: number;    // For image resizing before SSIM
-}
-
-export interface ComprehensiveScanResult {
-  jobId: string;
-  duplicates: DuplicateGroup[];
-  similarImages: SimilarImageGroup[];
-  brokenFiles: ScannedFile[];
-  totalFilesScanned: number;
-  summary: {
-    totalDuplicates: number;
-    totalSimilarImages: number;
-    totalBrokenFiles: number;
-    md5Duplicates: number;
-    pHashSimilar: number;
-    ssimSimilar: number;
-  };
-}
-
-const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif']; // Added TIFF
-const DEFAULT_SIMILARITY_THRESHOLD = 5; // Default Hamming distance threshold for image similarity (pHash)
-const DEFAULT_SSIM_THRESHOLD = 0.90; // Default SSIM similarity threshold
-const DEFAULT_NORMALIZED_SIZE = 256; // Default image normalization size for SSIM
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'];
+const DEFAULT_SIMILARITY_THRESHOLD = 5;
+const DEFAULT_SSIM_THRESHOLD = 0.90;
+const DEFAULT_NORMALIZED_SIZE = 256;
 
 function isImageFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
@@ -78,14 +27,12 @@ async function getPerceptualHash(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     imageHash({
       path: filePath,
-      mode: 'blockhash', // Using blockhash for perceptual hashing
-      bits: 16 // Generates a 64-bit hash (16 hex characters)
+      mode: 'blockhash',
+      bits: 16
     }, (error: Error | null, data: string) => {
       if (error) {
         console.error(`Error generating perceptual hash for ${filePath}:`, error);
-        // Fallback to SHA256 if pHash fails, though it won't be perceptual
-        // For now, we'll just resolve with an empty string or a specific error hash
-        resolve(''); // Indicate failure to generate pHash
+        resolve('');
       } else {
         resolve(data);
       }
@@ -99,7 +46,6 @@ function hexToBinary(hexChar: string): string {
 
 function getHammingDistance(hash1: string, hash2: string): number {
   if (hash1.length !== hash2.length || !hash1 || !hash2) {
-    // console.warn("Hashes have different lengths or are empty, cannot calculate Hamming distance accurately.");
     return Infinity;
   }
 
@@ -156,12 +102,10 @@ export async function performComprehensiveScan(
   const brokenFiles: ScannedFile[] = [];
   const validFiles: ScannedFile[] = [];
 
-  // Use provided config values or fall back to defaults
   const currentSimilarityThreshold = config?.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
   const currentSsimThreshold = config?.ssimThreshold ?? DEFAULT_SSIM_THRESHOLD;
   const currentNormalizedSize = config?.normalizedSize ?? DEFAULT_NORMALIZED_SIZE;
 
-  // --- Pass 1: Initial scan, hashing, and broken file detection ---
   for (const file of files) {
     const fileType: FileType = isImageFile(file.fullPath) ? 'image' : 'other';
     let md5Hash: string = '';
@@ -169,12 +113,10 @@ export async function performComprehensiveScan(
     let isFileBroken = false;
 
     try {
-      // Check for zero-byte files first
       if (await isZeroByteFile(file.fullPath)) {
         isFileBroken = true;
         console.warn(`[Scan] Zero-byte file detected: ${file.fullPath}`);
       } else if (fileType === 'image') {
-        // For images, check if it's a broken image
         if (await isBrokenImage(file.fullPath)) {
           isFileBroken = true;
           console.warn(`[Scan] Broken image detected: ${file.fullPath}`);
@@ -214,13 +156,12 @@ export async function performComprehensiveScan(
 
   const duplicates: DuplicateGroup[] = [];
   const similarImages: SimilarImageGroup[] = [];
-  const processedFileIds = new Set<string>(brokenFiles.map(f => f.id)); // Start with broken files as processed
+  const processedFileIds = new Set<string>(brokenFiles.map(f => f.id));
 
   let md5DuplicatesCount = 0;
   let pHashSimilarCount = 0;
   let ssimSimilarCount = 0;
 
-  // --- Pass 2: Find MD5 duplicates (exact match for all valid file types) ---
   const md5Map = new Map<string, ScannedFile[]>();
   for (const file of validFiles) {
     if (!processedFileIds.has(file.id)) {
@@ -245,7 +186,6 @@ export async function performComprehensiveScan(
     }
   }
 
-  // --- Pass 3: Find pHash similar images for remaining valid image files ---
   const remainingImageFilesForPHash = validFiles.filter(
     (f) => !processedFileIds.has(f.id) && f.type === 'image' && f.pHash
   );
@@ -277,7 +217,7 @@ export async function performComprehensiveScan(
 
     if (currentGroup.similar.length > 0) {
       similarImages.push({
-        hash: currentGroup.original.pHash!, // Fixed: Changed 'group' to 'currentGroup'
+        hash: currentGroup.original.pHash!,
         original: currentGroup.original,
         similar: currentGroup.similar.map(s => ({ ...s, detectionMethod: 'pHash' })),
         detectionMethod: 'pHash',
@@ -288,7 +228,6 @@ export async function performComprehensiveScan(
     }
   }
 
-  // --- Pass 4: Find SSIM similar images for remaining valid image files ---
   const remainingImageFilesForSSIM = validFiles.filter(
     (f) => !processedFileIds.has(f.id) && f.type === 'image'
   );
@@ -317,7 +256,7 @@ export async function performComprehensiveScan(
 
     if (ssimGroup.similar.length > 0) {
       similarImages.push({
-        hash: currentFile.md5Hash, // Using MD5 as a fallback hash for SSIM groups
+        hash: currentFile.md5Hash,
         original: currentFile,
         similar: ssimGroup.similar.map(s => ({ ...s, detectionMethod: 'SSIM' })),
         detectionMethod: 'SSIM',

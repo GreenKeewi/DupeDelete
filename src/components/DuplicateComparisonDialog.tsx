@@ -4,7 +4,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image as ImageIcon, FileText } from "lucide-react";
-import { ScannedFile } from "@/lib/duplicate-detection";
+import { ScannedFile } from "@/types/detection"; // Corrected import path
 
 interface DuplicateComparisonDialogProps {
   isOpen: boolean;

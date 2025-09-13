@@ -4,7 +4,8 @@ import * as fs from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
 import { createTempDir, cleanupTempDir, getFilesInDir } from '@/lib/file-utils';
-import { performComprehensiveScan, DetectionConfig, ComprehensiveScanResult, DuplicateGroup, SimilarImageGroup, ScannedFile } from '@/lib/duplicate-detection'; // Updated import
+import { performComprehensiveScan } from '@/lib/duplicate-detection';
+import { DetectionConfig, ComprehensiveScanResult, ScannedFile } from '@/types/detection'; // Import types from new file
 
 // Set the maximum file size for uploads (e.g., 1GB)
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
       detectionConfig: {
         similarityThreshold: detectionConfig.similarityThreshold || 5,
         ssimThreshold: detectionConfig.ssimThreshold || 0.90,
-        normalizedSize: detectionConfig.normalizedSize || 256, // Corrected default
+        normalizedSize: detectionConfig.normalizedSize || 256,
       },
     });
 

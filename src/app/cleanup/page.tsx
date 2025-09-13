@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Download, Image as ImageIcon, Eye, AlertTriangle, FileWarning } from "lucide-react"; // Added AlertTriangle, FileWarning
+import { Trash2, Download, Image as ImageIcon, Eye, AlertTriangle, FileWarning } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
-import { ScannedFile, DuplicateGroup, SimilarImageGroup, ComprehensiveScanResult } from "@/lib/duplicate-detection"; // Import all necessary types
-import JSZip from "jszip"; // Import JSZip
-import { apiFetcher } from "@/lib/api-utils"; // Import the new apiFetcher
+import { ScannedFile, DuplicateGroup, SimilarImageGroup, ComprehensiveScanResult } from "@/types/detection"; // Import types from new file
+import JSZip from "jszip";
+import { apiFetcher } from "@/lib/api-utils";
 
 // Frontend-specific types for display
 interface DisplayFile extends ScannedFile {
@@ -19,21 +19,20 @@ interface DisplayFile extends ScannedFile {
 }
 
 export default function CleanupPage() {
-  const [allScannedFiles, setAllScannedFiles] = useState<DisplayFile[]>([]); // Store all scanned files from backend
-  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]); // Store exact duplicate groups
-  const [similarImages, setSimilarImages] = useState<SimilarImageGroup[]>([]); // Store similar image groups
-  const [brokenFiles, setBrokenFiles] = useState<ScannedFile[]>([]); // Store broken files
+  const [allScannedFiles, setAllScannedFiles] = useState<DisplayFile[]>([]);
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
+  const [similarImages, setSimilarImages] = useState<SimilarImageGroup[]>([]);
+  const [brokenFiles, setBrokenFiles] = useState<ScannedFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
   const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const router = useRouter();
 
-  // Clean up object URLs when component unmounts or allScannedFiles change
   useEffect(() => {
     return () => {
       allScannedFiles.forEach(file => {
-        if (file.type === "image" && file.fullPath.startsWith("blob:")) { // Only revoke if it's a client-side generated URL
+        if (file.type === "image" && file.fullPath.startsWith("blob:")) {
           URL.revokeObjectURL(file.fullPath);
         }
       });
@@ -49,7 +48,6 @@ export default function CleanupPage() {
       return;
     }
 
-    // The 100-file limit is now enforced on the backend, but a client-side check can provide faster feedback
     if (filesArray.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
       router.push("/pricing");
@@ -57,17 +55,16 @@ export default function CleanupPage() {
     }
 
     setIsProcessing(true);
-    setDuplicates([]); // Clear previous duplicates
-    setSimilarImages([]); // Clear previous similar images
-    setBrokenFiles([]); // Clear previous broken files
-    setAllScannedFiles([]); // Clear previous uploaded files
-    setSelectedForComparison(null); // Clear any previous comparison selection
+    setDuplicates([]);
+    setSimilarImages([]);
+    setBrokenFiles([]);
+    setAllScannedFiles([]);
+    setSelectedForComparison(null);
     setJobId(null);
     toast.loading("Zipping and uploading your folder for scan...", { id: "upload-scan" });
 
     const zip = new JSZip();
     for (const file of filesArray) {
-      // Use webkitRelativePath for folder structure, fallback to name
       const filePathInZip = file.webkitRelativePath || file.name;
       zip.file(filePathInZip, file);
     }
@@ -86,7 +83,7 @@ export default function CleanupPage() {
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
-      const scanResult = await apiFetcher<ComprehensiveScanResult>("/api/detect-duplicates", { // Changed endpoint
+      const scanResult = await apiFetcher<ComprehensiveScanResult>("/api/detect-duplicates", {
         method: "POST",
         body: formData,
         errorMessage: "Failed to upload and scan files."
@@ -94,7 +91,6 @@ export default function CleanupPage() {
       
       setJobId(scanResult.jobId);
 
-      // Combine all files from duplicates, similar images, and broken files into a single list for preview generation
       const allFilesFromScan: ScannedFile[] = [];
       scanResult.duplicates.forEach(group => {
         allFilesFromScan.push(group.original, ...group.duplicates);
@@ -104,7 +100,6 @@ export default function CleanupPage() {
       });
       allFilesFromScan.push(...scanResult.brokenFiles);
 
-      // Create client-side preview URLs for all scanned image files
       const filesWithPreviews: DisplayFile[] = allFilesFromScan.map((file: ScannedFile) => {
         if (file.type === "image") {
           return { ...file, previewUrl: `/api/preview?jobId=${scanResult.jobId}&relativePath=${encodeURIComponent(file.relativePath)}` };
@@ -113,7 +108,6 @@ export default function CleanupPage() {
       });
       setAllScannedFiles(filesWithPreviews);
 
-      // Update state with the comprehensive scan results
       setDuplicates(scanResult.duplicates);
       setSimilarImages(scanResult.similarImages);
       setBrokenFiles(scanResult.brokenFiles);
@@ -121,7 +115,6 @@ export default function CleanupPage() {
       toast.success("Scan complete! Review results below.", { id: "upload-scan" });
     } catch (error: any) {
       console.error("Upload error:", error);
-      // The apiFetcher already handles toast.error, so no need to duplicate here unless specific logic is needed
     } finally {
       setIsProcessing(false);
     }
@@ -133,21 +126,21 @@ export default function CleanupPage() {
         if (group.original.id === groupId) {
           return {
             ...group,
-            duplicates: group.duplicates.filter(dup => dup.id !== fileId)
+            duplicates: group.duplicates.filter((dup: ScannedFile) => dup.id !== fileId)
           };
         }
         return group;
-      }).filter(group => group.duplicates.length > 0)); // Remove group if no duplicates left
+      }).filter((group: DuplicateGroup) => group.duplicates.length > 0));
     } else if (groupType === 'similar') {
       setSimilarImages(prev => prev.map(group => {
         if (group.original.id === groupId) {
           return {
             ...group,
-            similar: group.similar.filter(sim => sim.id !== fileId)
+            similar: group.similar.filter((sim: ScannedFile) => sim.id !== fileId)
           };
         }
         return group;
-      }).filter(group => group.similar.length > 0)); // Remove group if no similar left
+      }).filter((group: SimilarImageGroup) => group.similar.length > 0));
     }
     toast.info("Image marked to keep.");
   };
@@ -158,21 +151,21 @@ export default function CleanupPage() {
         if (group.original.id === groupId) {
           return {
             ...group,
-            duplicates: group.duplicates.filter(dup => dup.id !== fileId)
+            duplicates: group.duplicates.filter((dup: ScannedFile) => dup.id !== fileId)
           };
         }
         return group;
-      }).filter(group => group.duplicates.length > 0));
+      }).filter((group: DuplicateGroup) => group.duplicates.length > 0));
     } else if (groupType === 'similar') {
       setSimilarImages(prev => prev.map(group => {
         if (group.original.id === groupId) {
           return {
             ...group,
-            similar: group.similar.filter(sim => sim.id !== fileId)
+            similar: group.similar.filter((sim: ScannedFile) => sim.id !== fileId)
           };
         }
         return group;
-      }).filter(group => group.similar.length > 0));
+      }).filter((group: SimilarImageGroup) => group.similar.length > 0));
     }
     toast.success("Image marked for deletion.");
   };
@@ -194,16 +187,11 @@ export default function CleanupPage() {
 
     toast.loading("Preparing your cleaned folder...", { id: "download-zip" });
     try {
-      // Determine which files to keep: all original files from groups, and any files not marked as duplicate/similar
       const filesToKeepRelativePaths: string[] = [];
 
-      // Add all original files from duplicate groups
       duplicates.forEach(group => filesToKeepRelativePaths.push(group.original.relativePath));
-      // Add all original files from similar image groups
       similarImages.forEach(group => filesToKeepRelativePaths.push(group.original.relativePath));
 
-      // Add any files that were not part of any duplicate/similar group (i.e., unique files)
-      // and were not broken.
       const allDuplicateAndSimilarFileIds = new Set<string>();
       duplicates.forEach(group => {
         allDuplicateAndSimilarFileIds.add(group.original.id);
@@ -213,7 +201,7 @@ export default function CleanupPage() {
         allDuplicateAndSimilarFileIds.add(group.original.id);
         group.similar.forEach(sim => allDuplicateAndSimilarFileIds.add(sim.id));
       });
-      brokenFiles.forEach(file => allDuplicateAndSimilarFileIds.add(file.id)); // Broken files are not kept
+      brokenFiles.forEach(file => allDuplicateAndSimilarFileIds.add(file.id));
 
       allScannedFiles.forEach(file => {
         if (!allDuplicateAndSimilarFileIds.has(file.id) && !file.isBroken) {
@@ -221,7 +209,6 @@ export default function CleanupPage() {
         }
       });
 
-      // Filter out any duplicates in the filesToKeepRelativePaths array
       const uniqueFilesToKeep = Array.from(new Set(filesToKeepRelativePaths));
 
       const response = await fetch("/api/download", {

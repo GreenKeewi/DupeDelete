@@ -7,31 +7,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
-import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog"; // Import the new component
+import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
+import { ScannedFile } from "@/lib/duplicate-detection"; // Import ScannedFile type from backend
 
-interface DuplicateFile {
+interface FrontendDuplicateFile {
   id: string;
   fileName: string;
-  path: string; // Original path, for context
-  type: "image" | "other"; // e.g., "image", "other"
+  relativePath: string; // Path relative to the extracted folder root
+  type: "image" | "other";
   previewUrl?: string; // For images, a URL to display the preview
-  originalFileId?: string; // New: Link to its original for comparison
+  originalFileId?: string; // Link to its original for comparison
 }
 
 export default function CleanupPage() {
-  const [uploadedFiles, setUploadedFiles] = useState<DuplicateFile[]>([]); // Store all uploaded files for lookup
-  const [duplicates, setDuplicates] = useState<DuplicateFile[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<ScannedFile[]>([]); // Store all scanned files from backend
+  const [duplicates, setDuplicates] = useState<FrontendDuplicateFile[]>([]); // Store only the duplicate entries for display
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
-  const [selectedForComparison, setSelectedForComparison] = useState<{ original: DuplicateFile; duplicate: DuplicateFile } | null>(null);
+  const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
   const router = useRouter();
 
-  // Clean up object URLs when component unmounts or duplicates change
+  // Clean up object URLs when component unmounts or uploadedFiles change
   useEffect(() => {
     return () => {
       uploadedFiles.forEach(file => {
-        if (file.previewUrl) {
-          URL.revokeObjectURL(file.previewUrl);
+        if (file.type === "image" && file.fullPath.startsWith("blob:")) { // Only revoke if it's a client-side generated URL
+          URL.revokeObjectURL(file.fullPath);
         }
       });
     };
@@ -46,6 +48,7 @@ export default function CleanupPage() {
       return;
     }
 
+    // The 100-file limit is now enforced on the backend, but a client-side check can provide faster feedback
     if (filesArray.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
       router.push("/pricing");
@@ -54,57 +57,68 @@ export default function CleanupPage() {
 
     setIsProcessing(true);
     setDuplicates([]); // Clear previous duplicates
+    setUploadedFiles([]); // Clear previous uploaded files
     setSelectedForComparison(null); // Clear any previous comparison selection
+    setJobId(null);
     toast.loading("Uploading and scanning for duplicate images...", { id: "upload-scan" });
 
-    // Process files to create preview URLs for images and assign unique IDs
-    const processedFiles: DuplicateFile[] = await Promise.all(filesArray.map(async (file, index) => {
-      const fileType = file.type.startsWith("image/") ? "image" : "other";
-      let previewUrl: string | undefined;
+    const formData = new FormData();
+    // Create a dummy zip file on the client-side to send to the backend.
+    // In a real scenario, you might zip the folder client-side or handle individual file uploads.
+    // For this example, we'll simulate a single zip file upload.
+    const dummyZipBlob = new Blob(filesArray, { type: 'application/zip' });
+    formData.append('file', dummyZipBlob, 'uploaded_folder.zip');
 
-      if (fileType === "image") {
-        previewUrl = URL.createObjectURL(file);
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403 && errorData.redirect) {
+          toast.warning(errorData.message, { id: "upload-scan" });
+          router.push(errorData.redirect);
+          return;
+        }
+        throw new Error(errorData.message || "Failed to upload and scan files.");
       }
 
-      return {
-        id: `file-${index}-${file.name}`, // More robust unique ID
-        fileName: file.name,
-        path: `/${file.webkitRelativePath || file.name}`,
-        type: fileType,
-        previewUrl,
-      };
-    }));
-    setUploadedFiles(processedFiles); // Store all processed files
+      const { jobId, duplicateGroups, allScannedFiles } = await response.json();
+      setJobId(jobId);
 
-    // Simulate backend processing for duplicate detection
-    setTimeout(() => {
-      const mockDuplicates: DuplicateFile[] = [];
-      
-      // Create mock duplicates:
-      // If there are at least 2 files, make file[1] a duplicate of file[0]
-      if (processedFiles.length >= 2) {
-        mockDuplicates.push({ 
-          ...processedFiles[1], 
-          id: `dup-${processedFiles[1].id}`, // Distinct ID for the duplicate entry
-          originalFileId: processedFiles[0].id // Link to the original
-        });
-      }
-      // If there are at least 4 files, make file[3] a duplicate of file[2]
-      if (processedFiles.length >= 4) {
-        mockDuplicates.push({ 
-          ...processedFiles[3], 
-          id: `dup-${processedFiles[3].id}`, 
-          originalFileId: processedFiles[2].id 
-        });
-      }
-      
-      // Filter out duplicates that might have been added multiple times if the original file was also a duplicate
-      const uniqueDuplicates = Array.from(new Map(mockDuplicates.map(item => [item.fileName, item])).values());
+      // Create client-side preview URLs for all scanned image files
+      const filesWithPreviews: ScannedFile[] = allScannedFiles.map((file: ScannedFile) => {
+        if (file.type === "image") {
+          // For now, we cannot directly create Object URLs from backend paths.
+          // This would require the backend to serve the images or return base64.
+          // For the current mock, we'll just use the fullPath as a placeholder.
+          // In a real app, you'd have an endpoint like /api/preview?jobId=...&relativePath=...
+          return { ...file, fullPath: `/api/preview?jobId=${jobId}&relativePath=${encodeURIComponent(file.relativePath)}` };
+        }
+        return file;
+      });
+      setUploadedFiles(filesWithPreviews);
 
-      setDuplicates(uniqueDuplicates);
-      setIsProcessing(false);
+      // Map backend duplicate groups to frontend format, resolving preview URLs
+      const formattedDuplicates: FrontendDuplicateFile[] = duplicateGroups.map((dup: FrontendDuplicateFile) => {
+        const originalScannedFile = filesWithPreviews.find(f => f.id === dup.originalFileId);
+        const duplicateScannedFile = filesWithPreviews.find(f => f.id === dup.id);
+        return {
+          ...dup,
+          previewUrl: duplicateScannedFile?.fullPath, // Use the resolved fullPath as previewUrl
+        };
+      });
+      setDuplicates(formattedDuplicates);
+
       toast.success("Scan complete! Review duplicate images below.", { id: "upload-scan" });
-    }, 3000);
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDeleteAll = () => {
@@ -122,17 +136,18 @@ export default function CleanupPage() {
     toast.success("Image marked for deletion.");
   };
 
-  const handleCompare = (duplicate: DuplicateFile) => {
+  const handleCompare = (duplicate: FrontendDuplicateFile) => {
     if (duplicate.originalFileId) {
       const original = uploadedFiles.find(file => file.id === duplicate.originalFileId);
-      if (original) {
-        setSelectedForComparison({ original, duplicate });
+      const duplicateFull = uploadedFiles.find(file => file.id === duplicate.id);
+      if (original && duplicateFull) {
+        setSelectedForComparison({ original, duplicate: duplicateFull });
         setIsCompareDialogOpen(true);
       } else {
-        toast.error("Original image for comparison not found.");
+        toast.error("Original or duplicate image for comparison not found.");
       }
     } else {
-      toast.info("This duplicate does not have a linked original for comparison in this mock.");
+      toast.info("This duplicate does not have a linked original for comparison.");
     }
   };
 
@@ -141,23 +156,21 @@ export default function CleanupPage() {
       toast.error("Please wait for the current operation to finish.");
       return;
     }
-    if (uploadedFiles.length === 0) {
+    if (!jobId || uploadedFiles.length === 0) {
       toast.error("Please upload a folder first.");
       return;
     }
 
     toast.loading("Preparing your cleaned folder...", { id: "download-zip" });
     try {
-      // Send the list of files to keep/delete to the backend
-      // For a real application, you'd send identifiers that the backend can use to locate the actual files.
-      // Here, we're just sending file names for a mock.
-      const filesToKeep = uploadedFiles.filter(file => !duplicates.some(dup => dup.fileName === file.fileName));
+      // Send the list of files to keep to the backend
+      const filesToKeep = uploadedFiles.filter(file => !duplicates.some(dup => dup.id === file.id));
       const response = await fetch("/api/download", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ filesToKeep: filesToKeep.map(f => f.fileName) }),
+        body: JSON.stringify({ jobId, filesToKeep: filesToKeep.map(f => f.relativePath) }),
       });
 
       if (!response.ok) {
@@ -255,7 +268,7 @@ export default function CleanupPage() {
           <Button
             onClick={handleDownload}
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            disabled={uploadedFiles.length === 0 || isProcessing}
+            disabled={!jobId || uploadedFiles.length === 0 || isProcessing}
           >
             <Download className="mr-2 h-4 w-4" /> Download Cleaned Folder
           </Button>

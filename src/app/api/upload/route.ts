@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { promises as fsp } from 'fs'; // Renamed to fsp for promise-based functions
-import * as fs from 'fs'; // Imported standard fs for createReadStream
+import { promises as fsp } from 'fs';
+import * as fs from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
 import { createTempDir, cleanupTempDir, getFilesInDir } from '@/lib/file-utils';
-import { scanFilesForDuplicates, DuplicateGroup } from '@/lib/duplicate-detection';
+import { scanFilesForDuplicates, DuplicateGroup as BackendDuplicateGroup, ScannedFile } from '@/lib/duplicate-detection';
 
 // Declare module for unzipper is now in src/types/unzipper.d.ts
 
@@ -16,6 +16,15 @@ export const config = {
     bodyParser: false, // Disable Next.js body parser to handle file streams
   },
 };
+
+// Define the structure for files sent to the frontend
+interface FrontendDuplicateFile {
+  id: string;
+  fileName: string;
+  relativePath: string; // Path relative to the extracted folder root
+  type: "image" | "other";
+  originalFileId?: string; // Link to its original for comparison
+}
 
 export async function POST(req: Request) {
   if (req.method !== 'POST') {
@@ -48,10 +57,10 @@ export async function POST(req: Request) {
     // Save the uploaded zip file temporarily
     tempZipPath = path.join(extractedDirPath, file.name); // Store zip inside the job's extracted dir
     const buffer = Buffer.from(await file.arrayBuffer());
-    await fsp.writeFile(tempZipPath, buffer); // Use fsp for promise-based writeFile
+    await fsp.writeFile(tempZipPath, buffer);
 
     // Extract the zip file
-    await fs.createReadStream(tempZipPath) // Use fs for createReadStream
+    await fs.createReadStream(tempZipPath)
       .pipe(unzipper.Extract({ path: extractedDirPath }))
       .promise();
 
@@ -72,7 +81,7 @@ export async function POST(req: Request) {
     }
 
     const filesWithRelativePaths = await Promise.all(filesToScan.map(async (fullPath) => {
-      const stats = await fsp.stat(fullPath); // Use fsp for promise-based stat
+      const stats = await fsp.stat(fullPath);
       return {
         fullPath,
         relativePath: path.relative(extractedDirPath!, fullPath),
@@ -80,14 +89,45 @@ export async function POST(req: Request) {
       };
     }));
 
-    const duplicateGroups: DuplicateGroup[] = await scanFilesForDuplicates(filesWithRelativePaths);
+    const backendDuplicateGroups: BackendDuplicateGroup[] = await scanFilesForDuplicates(filesWithRelativePaths);
+
+    // Format the duplicate groups for the frontend
+    const frontendDuplicates: FrontendDuplicateFile[] = [];
+    const allScannedFilesForFrontend: ScannedFile[] = []; // To store all scanned files for frontend lookup
+
+    // Collect all scanned files first
+    for (const group of backendDuplicateGroups) {
+      allScannedFilesForFrontend.push(group.original);
+      group.duplicates.forEach(dup => allScannedFilesForFrontend.push(dup));
+    }
+    // Add any unique files that weren't part of a duplicate group
+    const uniqueFiles = filesWithRelativePaths.filter(f => !allScannedFilesForFrontend.some(s => s.fullPath === f.fullPath));
+    for (const file of uniqueFiles) {
+      // Re-hash to get the ScannedFile structure, or just create a minimal one
+      // For simplicity, we'll just add the ones that are part of a group or are originals.
+      // The frontend's `uploadedFiles` state will hold all initial files.
+    }
+
+
+    // Now, populate frontendDuplicates
+    for (const group of backendDuplicateGroups) {
+      group.duplicates.forEach(dup => {
+        frontendDuplicates.push({
+          id: dup.id,
+          fileName: dup.fileName,
+          relativePath: dup.relativePath,
+          type: dup.type,
+          originalFileId: group.original.id, // Link to the original file's ID
+        });
+      });
+    }
 
     // Clean up the temporary zip file, but keep the extracted directory for cleanup process
     if (tempZipPath) {
-      await fsp.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err)); // Use fsp for promise-based unlink
+      await fsp.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err));
     }
 
-    return NextResponse.json({ jobId, duplicateGroups });
+    return NextResponse.json({ jobId, duplicateGroups: frontendDuplicates, allScannedFiles: allScannedFilesForFrontend });
   } catch (error) {
     console.error('Error processing upload:', error);
     if (extractedDirPath) {

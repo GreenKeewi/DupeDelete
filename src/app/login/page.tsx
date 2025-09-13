@@ -1,23 +1,27 @@
 "use client";
 
-import { Auth } from '@supabase/auth-ui-react';
+import dynamic from 'next/dynamic'; // Import dynamic for client-side rendering
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useSearchParams } from 'next/navigation';
-// Removed useEffect and toast imports as NEXT_PUBLIC_BASE_URL is now set.
+
+// Dynamically import Auth component with SSR disabled
+const DynamicAuth = dynamic(() =>
+  import('@supabase/auth-ui-react').then((mod) => mod.Auth),
+  { ssr: false }
+);
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect_to') || '/pricing';
 
-  // NEXT_PUBLIC_BASE_URL is now expected to be set in the environment.
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL!; 
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-lg shadow-md">
         <h2 className="text-2xl font-bold text-center text-foreground">Welcome to DupeDelete</h2>
-        <Auth
+        <DynamicAuth // Use DynamicAuth here
           supabaseClient={supabase}
           providers={[]}
           appearance={{
@@ -32,7 +36,7 @@ export default function LoginPage() {
             },
           }}
           theme="light"
-          redirectTo={`${baseUrl}${redirectTo}`} // Use the dynamic redirectTo URL
+          redirectTo={`${baseUrl}${redirectTo}`}
         />
       </div>
     </div>

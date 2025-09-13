@@ -7,17 +7,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: Request) {
   if (req.method !== "POST") {
-    return new NextResponse("Method Not Allowed", { status: 405 });
+    return new NextResponse(JSON.stringify({ message: "Method Not Allowed" }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
   try {
     const { plan, interval } = await req.json(); // Get interval from request body
 
     if (!plan || (plan !== "basic" && plan !== "pro")) {
-      return new NextResponse("Invalid plan specified", { status: 400 });
+      return new NextResponse(JSON.stringify({ message: "Invalid plan specified" }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
     if (!interval || (interval !== "monthly" && interval !== "yearly")) {
-      return new NextResponse("Invalid interval specified", { status: 400 });
+      return new NextResponse(JSON.stringify({ message: "Invalid interval specified" }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     let priceId: string | undefined;
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
     if (!priceId) {
       console.error(`Stripe price ID not configured for plan: ${plan} and interval: ${interval}`);
-      return new NextResponse(`Stripe price ID not configured for ${plan} ${interval} plan.`, { status: 500 });
+      return new NextResponse(JSON.stringify({ message: `Stripe price ID not configured for ${plan} ${interval} plan.` }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -53,6 +53,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("Stripe checkout session creation failed:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return new NextResponse(JSON.stringify({ message: "Internal Server Error", error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

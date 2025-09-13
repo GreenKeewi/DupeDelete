@@ -17,7 +17,7 @@ export const config = {
 
 export async function POST(req: Request) {
   if (req.method !== 'POST') {
-    return new NextResponse('Method Not Allowed', { status: 405 });
+    return new NextResponse(JSON.stringify({ message: 'Method Not Allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
   let tempZipPath: string | undefined;
@@ -39,15 +39,15 @@ export async function POST(req: Request) {
     if (normalizedSize) detectionConfig.normalizedSize = parseInt(normalizedSize);
 
     if (!file) {
-      return new NextResponse('No file uploaded.', { status: 400 });
+      return new NextResponse(JSON.stringify({ message: 'No file uploaded.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return new NextResponse(`File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.`, { status: 413 });
+      return new NextResponse(JSON.stringify({ message: `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.` }), { status: 413, headers: { 'Content-Type': 'application/json' } });
     }
 
     if (file.type !== 'application/zip' && file.type !== 'application/x-zip-compressed') {
-      return new NextResponse('Only ZIP files are allowed.', { status: 400 });
+      return new NextResponse(JSON.stringify({ message: 'Only ZIP files are allowed.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     // Create a temporary directory for this job
@@ -127,7 +127,6 @@ export async function POST(req: Request) {
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(JSON.stringify({ message: 'Internal Server Error', error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
-

@@ -11,6 +11,7 @@ import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialo
 import { ScannedFile, DuplicateGroup, SimilarImageGroup, ComprehensiveScanResult } from "@/types/detection";
 import JSZip from "jszip";
 import { apiFetcher } from "@/lib/api-utils";
+import { Progress } from "@/components/ui/progress"; // Import Progress component
 
 // Frontend-specific types for display
 interface DisplayFile extends ScannedFile {
@@ -293,12 +294,19 @@ export default function CleanupPage() {
             multiple
             onChange={handleUpload}
             className="hidden"
+            disabled={isProcessing} // Disable input during processing
           />
           <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
           {allScannedFiles.length > 0 && (
             <p className="text-sm text-primary">
               {allScannedFiles.length} files selected.
             </p>
+          )}
+          {isProcessing && (
+            <div className="w-full max-w-sm mt-4">
+              <Progress value={undefined} className="w-full" /> {/* Indeterminate progress bar */}
+              <p className="text-sm text-muted-foreground mt-2">Scanning files...</p>
+            </div>
           )}
         </CardContent>
       </Card>

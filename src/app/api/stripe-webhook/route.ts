@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import StripeSDK from 'stripe'; // Import Stripe as a default export
-import { supabase } from '@/integrations/supabase/client'; // Import Supabase client
+import StripeSDK from 'stripe';
+import { supabase } from '@/integrations/supabase/client';
 
 const stripe = new StripeSDK(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-08-27.basil",
@@ -10,14 +10,18 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export const config = {
   api: {
-    bodyParser: false, // Disable Next.js body parser for webhooks
+    bodyParser: false,
   },
 };
 
+// Define a local interface to ensure current_period_end is recognized
+interface StripeSubscriptionWithPeriodEnd extends StripeSDK.Subscription {
+  current_period_end: number; // Explicitly define it as a number (Unix timestamp)
+}
+
 export async function POST(req: Request) {
-  // Read the raw request body as an ArrayBuffer
   const rawBody = await req.arrayBuffer();
-  const buf = Buffer.from(rawBody); // Convert ArrayBuffer to Node.js Buffer
+  const buf = Buffer.from(rawBody);
 
   const sig = req.headers.get('stripe-signature');
 
@@ -35,7 +39,7 @@ export async function POST(req: Request) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        const checkoutSession = event.data.object as StripeSDK.Checkout.Session; // Corrected type reference
+        const checkoutSession = event.data.object as StripeSDK.Checkout.Session;
         const userId = checkoutSession.client_reference_id;
         const customerId = checkoutSession.customer as string;
         const subscriptionId = checkoutSession.subscription as string;
@@ -46,8 +50,8 @@ export async function POST(req: Request) {
           return new NextResponse('Missing data', { status: 400 });
         }
 
-        // Retrieve the subscription to get current_period_end
-        const stripeSubscription: StripeSDK.Subscription = await stripe.subscriptions.retrieve(subscriptionId); // Corrected type reference
+        // Retrieve the subscription and cast to our local interface
+        const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as StripeSubscriptionWithPeriodEnd;
 
         const { data, error } = await supabase
           .from('subscriptions')
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
               plan_id: planId,
               current_period_end: new Date(stripeSubscription.current_period_end * 1000).toISOString(),
             },
-            { onConflict: 'user_id', ignoreDuplicates: false } // Update if user_id exists
+            { onConflict: 'user_id', ignoreDuplicates: false }
           );
 
         if (error) {
@@ -72,12 +76,12 @@ export async function POST(req: Request) {
 
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        const subscription: StripeSDK.Subscription = event.data.object as StripeSDK.Subscription; // Corrected type reference
+        // Cast the subscription object to our local interface
+        const subscription = event.data.object as StripeSubscriptionWithPeriodEnd;
         let updatedUserId = subscription.metadata.supabase_user_id;
 
         if (!updatedUserId) {
           console.warn('Subscription updated/deleted event missing supabase_user_id in metadata:', subscription);
-          // Attempt to find by stripe_subscription_id if userId is missing
           const { data: existingSub, error: findError } = await supabase
             .from('subscriptions')
             .select('user_id')
@@ -88,7 +92,6 @@ export async function POST(req: Request) {
             console.error('Could not find user for subscription update/delete:', subscription.id, findError);
             return new NextResponse('User not found for subscription update', { status: 400 });
           }
-          // If found, use that user ID
           updatedUserId = existingSub.user_id;
         }
 
@@ -97,7 +100,6 @@ export async function POST(req: Request) {
           .update({
             status: subscription.status,
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            // Optionally update plan_id if it can change during updates
           })
           .eq('stripe_subscription_id', subscription.id);
 

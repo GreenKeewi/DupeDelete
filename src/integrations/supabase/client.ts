@@ -6,15 +6,15 @@ const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Client-side Supabase client (for browser use)
 if (!SUPABASE_URL) {
-  console.error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL');
+  throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL. Please set it in your .env.local file.');
 }
 if (!SUPABASE_PUBLISHABLE_KEY) {
-  console.error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY. Please set it in your .env.local file.');
 }
 
 export const supabase = createClient(
-  SUPABASE_URL as string, // Cast to string, as the error check above handles missing values
-  SUPABASE_PUBLISHABLE_KEY as string // Cast to string
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
 );
 
 // Server-side Supabase client (for API routes/server components)

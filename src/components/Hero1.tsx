@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { MoveRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import { useSession } from "@/components/SessionContextProvider"; // Import useSession
+import { useRouter } from "next/navigation"; // Import useRouter
 
 export const Hero1 = () => {
-  const router = useRouter();
-  const { user, isLoading } = useSession(); // Get user and loading state from session
+  const router = useRouter(); // Initialize useRouter
 
   const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
@@ -20,21 +18,6 @@ export const Hero1 = () => {
       if (targetElement) {
         targetElement.scrollIntoView({ behavior: 'smooth' });
       }
-    }
-  };
-
-  const handleUpgradeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (isLoading) {
-      // Do nothing if session is still loading
-      return;
-    }
-    if (!user) {
-      // If not logged in, redirect to login page with a return URL to pricing
-      router.push(`/login?redirect_to=${encodeURIComponent('/pricing')}`);
-    } else {
-      // If logged in, go directly to the pricing page
-      router.push('/pricing');
     }
   };
 
@@ -69,16 +52,16 @@ export const Hero1 = () => {
                 Clean up to 100 images free
               </Button>
             </Link>
-            <Button 
-              size="lg" 
-              className="gap-4 w-full 
-                         sm:px-4 sm:py-2 sm:text-sm 
-                         md:px-6 md:py-3 md:text-base"
-              onClick={handleUpgradeClick}
-              disabled={isLoading} // Disable button while session is loading
-            >
-              {isLoading ? "Loading..." : user ? "Upgrade for unlimited cleaning" : "Login to Upgrade"} <MoveRight className="w-4 h-4" />
-            </Button>
+            <Link href="/#pricing-section" onClick={(e) => handleScrollToSection(e, 'pricing-section')} className="w-full sm:w-auto">
+              <Button 
+                size="lg" 
+                className="gap-4 w-full 
+                           sm:px-4 sm:py-2 sm:text-sm 
+                           md:px-6 md:py-3 md:text-base"
+              >
+                Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

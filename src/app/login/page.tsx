@@ -1,27 +1,12 @@
-"use client";
+"use client"; // Added "use client" directive as this component uses hooks and client-side features.
 
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { supabase } from '@/integrations/supabase/client';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
-import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client'; // Corrected import to use 'supabase'
 
 export default function LoginPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect_to') || '/dashboard'; // Default redirect to dashboard
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        toast.success("Logged in successfully!");
-        router.push(redirectTo);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [router, redirectTo]);
+  // The supabase client is already initialized and exported from '@/integrations/supabase/client'
+  // No need to call createClient() again here.
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -29,7 +14,7 @@ export default function LoginPage() {
         <h2 className="text-2xl font-bold text-center text-foreground">Welcome to DupeDelete</h2>
         <Auth
           supabaseClient={supabase}
-          providers={[]}
+          providers={[]} // No third-party providers for now
           appearance={{
             theme: ThemeSupa,
             variables: {
@@ -42,7 +27,7 @@ export default function LoginPage() {
             },
           }}
           theme="light"
-          redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/login?redirect_to=${encodeURIComponent(redirectTo)}`} // Redirect back to this page with original redirect_to
+          redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard`} // Redirect after successful login
         />
       </div>
     </div>

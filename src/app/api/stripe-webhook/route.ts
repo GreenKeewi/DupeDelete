@@ -51,7 +51,7 @@ export async function POST(req: Request) {
         }
 
         // Retrieve the subscription and cast to our local interface
-        const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as StripeSubscriptionWithPeriodEnd;
+        const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as StripeSubscriptionWithPeriodEnd;
 
         const { data, error } = await supabase
           .from('subscriptions')
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
         // Cast the subscription object to our local interface
-        const subscription = event.data.object as StripeSubscriptionWithPeriodEnd;
+        const subscription = event.data.object as unknown as StripeSubscriptionWithPeriodEnd;
         let updatedUserId = subscription.metadata.supabase_user_id;
 
         if (!updatedUserId) {

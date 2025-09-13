@@ -1,95 +1,123 @@
-import React from 'react';
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { CheckIcon } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
-const features = [
-  "Feature 1",
-  "Feature 2",
-  "Feature 3",
-  "Feature 4",
-];
+export const PricingSection = () => {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [isYearly, setIsYearly] = useState(false);
 
-export function PricingSection() {
+  const handleCheckout = async (plan: "basic" | "pro") => {
+    setLoading(true);
+    const interval = isYearly ? "yearly" : "monthly";
+    toast.loading(`Initiating ${plan} ${interval} plan checkout...`, { id: "checkout" });
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan, interval }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create checkout session.");
+      }
+
+      const { url } = await response.json();
+      if (url) {
+        router.push(url);
+      } else {
+        throw new Error("No checkout URL received.");
+      }
+    } catch (error) {
+      console.error("Stripe checkout error:", error);
+      toast.error("Failed to start checkout. Please try again.", { id: "checkout" });
+      setLoading(false);
+    }
+  };
+
   return (
-    <section id="pricing" className="w-full py-12 md:py-24 lg:py-32 bg-gray-100 dark:bg-gray-800">
-      <div className="container px-4 md:px-6">
-        <div className="flex flex-col items-center justify-center space-y-4 text-center">
-          <div className="space-y-2">
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Simple, Transparent Pricing</h2>
-            <p className="max-w-[900px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed dark:text-gray-400">
-              Choose the plan that's right for you. No hidden fees, no surprises.
-            </p>
-          </div>
-        </div>
-        <div className="mx-auto grid max-w-sm items-start gap-8 sm:max-w-4xl sm:grid-cols-2 md:gap-12 lg:max-w-5xl lg:grid-cols-3 mt-10">
-          <Card className="flex flex-col justify-between h-full">
-            <CardHeader>
-              <CardTitle>Basic</CardTitle>
-              <CardDescription>Perfect for individuals getting started.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="text-4xl font-bold">$9</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">per month</div>
-              <ul className="grid gap-2 text-sm">
-                {features.slice(0, 2).map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2">
-                    <CheckIcon className="h-4 w-4 text-green-500" /> {feature}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full">Get Started</Button>
-            </CardFooter>
-          </Card>
+    <div id="pricing-section" className="flex flex-col items-center justify-center">
+      <h1 className="text-4xl font-bold text-center mb-4">Choose Your Plan</h1>
+      <p className="text-lg text-muted-foreground text-center mb-8 max-w-2xl">
+        Unlock unlimited cleaning and advanced features with our flexible plans.
+      </p>
 
-          <Card className="flex flex-col justify-between h-full border-2 border-primary">
-            <CardHeader>
-              <CardTitle>Pro</CardTitle>
-              <CardDescription>For growing teams needing more power.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="text-4xl font-bold">$29</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">per month</div>
-              <ul className="grid gap-2 text-sm">
-                {features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2">
-                    <CheckIcon className="h-4 w-4 text-green-500" /> {feature}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full">Go Pro</Button>
-            </CardFooter>
-          </Card>
-
-          <Card className="flex flex-col justify-between h-full">
-            <CardHeader>
-              <CardTitle>Enterprise</CardTitle>
-              <CardDescription>Custom solutions for large organizations.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="text-4xl font-bold">Custom</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">pricing</div>
-              <ul className="grid gap-2 text-sm">
-                {features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2">
-                    <CheckIcon className="h-4 w-4 text-green-500" /> {feature}
-                  </li>
-                ))}
-                <li className="flex items-center gap-2">
-                  <CheckIcon className="h-4 w-4 text-green-500" /> Dedicated Support
-                </li>
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" variant="outline">Contact Sales</Button>
-            </CardFooter>
-          </Card>
-        </div>
+      {/* Monthly/Yearly Toggle */}
+      <div className="flex items-center space-x-2 mb-12">
+        <Label htmlFor="billing-toggle" className="text-lg">Monthly</Label>
+        <Switch
+          id="billing-toggle"
+          checked={isYearly}
+          onCheckedChange={setIsYearly}
+          className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground"
+        />
+        <Label htmlFor="billing-toggle" className="text-lg">Yearly</Label>
       </div>
-    </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
+        {/* Basic Plan Card */}
+        <Card className="flex flex-col justify-between">
+          <CardHeader>
+            <CardTitle className="text-3xl">Basic Plan</CardTitle>
+            <CardDescription className="text-lg mt-2">
+              {isYearly ? "$100/year" : "$10/month"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">Perfect for occasional cleaning.</p>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Clean up to 1,000 images</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Standard duplicate image detection</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Email support</li>
+            </ul>
+          </CardContent>
+          <CardFooter>
+            <Button
+              className="w-full"
+              onClick={() => handleCheckout("basic")}
+              disabled={loading}
+            >
+              {loading ? "Processing..." : `Get Basic Plan (${isYearly ? "Yearly" : "Monthly"})`}
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* Pro Plan Card */}
+        <Card className="flex flex-col justify-between border-primary shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-3xl">Pro Plan</CardTitle>
+            <CardDescription className="text-lg mt-2">
+              {isYearly ? "$160/year" : "$16/month"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">For power users with large collections.</p>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Unlimited image cleaning</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Advanced duplicate image detection</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Priority support</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Future premium features</li>
+            </ul>
+          </CardContent>
+          <CardFooter>
+            <Button
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => handleCheckout("pro")}
+              disabled={loading}
+            >
+              {loading ? "Processing..." : `Get Pro Plan (${isYearly ? "Yearly" : "Monthly"})`}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
   );
-}
+};

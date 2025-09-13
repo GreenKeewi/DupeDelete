@@ -1,34 +1,63 @@
-import { Button } from "@/components/ui/button"; // Assuming this path
+"use client";
 
-export function Hero1() {
+import Link from "next/link";
+import { MoveRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export const Hero1 = () => {
+  const handleScrollToFeature = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const targetId = e.currentTarget.href.split('#')[1];
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <section className="relative w-full py-12 md:py-24 lg:py-32 xl:py-48">
-      <div className="container px-4 md:px-6">
-        <div className="flex flex-col items-center space-y-4 text-center">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-              Your Awesome Product
+    <div className="w-full">
+      <div className="container mx-auto px-4">
+        <div className="flex gap-8 py-20 lg:py-40 items-center justify-center flex-col">
+          <div>
+            <Link href="#how-it-works" onClick={handleScrollToFeature}>
+              <Button variant="secondary" size="sm" className="gap-4">
+                Learn how DupeDelete works <MoveRight className="w-4 h-4" />
+              </Button>
+            </Link>
+          </div>
+          <div className="flex gap-4 flex-col">
+            <h1 className="text-5xl md:text-7xl max-w-2xl tracking-tighter text-center font-regular">
+              Clean Your Folders in Seconds
             </h1>
-            <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-              A brief description of your product and its benefits.
+            <p className="text-lg md:text-xl leading-relaxed tracking-tight text-muted-foreground max-w-2xl text-center">
+              Stop wasting storage on duplicate images. DupeDelete scans your folder, shows duplicate images in a checklist, and lets you keep what you want — all in just a few clicks.
             </p>
           </div>
-          <div className="space-x-4">
-            {/* Changed Link to <a> and href to #pricing for scrolling */}
-            <a href="#pricing" className="w-full sm:w-auto">
-              <Button
-                size="lg"
-                className="gap-4 w-full sm:px-4 sm:py-2 sm:text-sm"
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Link href="/cleanup" className="w-full sm:w-auto">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="gap-4 w-full 
+                           sm:px-4 sm:py-2 sm:text-sm 
+                           md:px-6 md:py-3 md:text-base"
               >
-                Get Started
+                Clean up to 100 images free
               </Button>
-            </a>
-            <Button variant="outline" size="lg" className="w-full sm:w-auto">
-              Learn More
-            </Button>
+            </Link>
+            <Link href="/pricing" className="w-full sm:w-auto">
+              <Button 
+                size="lg" 
+                className="gap-4 w-full 
+                           sm:px-4 sm:py-2 sm:text-sm 
+                           md:px-6 md:py-3 md:text-base"
+              >
+                Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
-}
+};

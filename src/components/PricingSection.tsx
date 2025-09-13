@@ -7,13 +7,22 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useSession } from "@/components/SessionContextProvider"; // Removed .tsx extension
 
 export const PricingSection = () => {
   const router = useRouter();
+  const { user, isLoading } = useSession(); // Get user and loading state from session
   const [loading, setLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
 
   const handleCheckout = async (plan: "basic" | "pro") => {
+    if (!user) {
+      // If not logged in, redirect to login page with a return URL
+      toast.info("Please log in to subscribe.", { id: "login-redirect" });
+      router.push(`/login?redirect_to=${encodeURIComponent('/pricing')}`);
+      return;
+    }
+
     setLoading(true);
     const interval = isYearly ? "yearly" : "monthly";
     toast.loading(`Initiating ${plan} ${interval} plan checkout...`, { id: "checkout" });
@@ -23,7 +32,7 @@ export const PricingSection = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ plan, interval }),
+        body: JSON.stringify({ plan, interval, userId: user.id }), // Pass userId to backend
       });
 
       if (!response.ok) {
@@ -83,9 +92,9 @@ export const PricingSection = () => {
             <Button
               className="w-full"
               onClick={() => handleCheckout("basic")}
-              disabled={loading}
+              disabled={loading || isLoading} // Disable if loading session or checkout
             >
-              {loading ? "Processing..." : `Get Basic Plan (${isYearly ? "Yearly" : "Monthly"})`}
+              {isLoading ? "Loading..." : (loading ? "Processing..." : `Get Basic Plan (${isYearly ? "Yearly" : "Monthly"})`)}
             </Button>
           </CardFooter>
         </Card>
@@ -111,9 +120,9 @@ export const PricingSection = () => {
             <Button
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => handleCheckout("pro")}
-              disabled={loading}
+              disabled={loading || isLoading} // Disable if loading session or checkout
             >
-              {loading ? "Processing..." : `Get Pro Plan (${isYearly ? "Yearly" : "Monthly"})`}
+              {isLoading ? "Loading..." : (loading ? "Processing..." : `Get Pro Plan (${isYearly ? "Yearly" : "Monthly"})`)}
             </Button>
           </CardFooter>
         </Card>

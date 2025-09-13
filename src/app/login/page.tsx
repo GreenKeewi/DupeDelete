@@ -7,7 +7,8 @@ import { useSearchParams } from 'next/navigation'; // Import useSearchParams
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect_to') || '/pricing'; // Default to /pricing if no redirect_to is specified
+  // Default to /dashboard if no redirect_to is specified
+  const redirectTo = searchParams.get('redirect_to') || '/dashboard'; 
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">

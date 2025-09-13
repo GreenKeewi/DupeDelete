@@ -3,14 +3,21 @@
 import Link from "next/link";
 import { MoveRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation"; // Import useRouter
 
 export const Hero1 = () => {
-  const handleScrollToFeature = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const router = useRouter(); // Initialize useRouter
+
+  const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
-    const targetId = e.currentTarget.href.split('#')[1];
-    const targetElement = document.getElementById(targetId);
-    if (targetElement) {
-      targetElement.scrollIntoView({ behavior: 'smooth' });
+    // If not on the home page, navigate to home and then scroll
+    if (window.location.pathname !== '/') {
+      router.push(`/#${sectionId}`);
+    } else {
+      const targetElement = document.getElementById(sectionId);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
@@ -19,7 +26,7 @@ export const Hero1 = () => {
       <div className="container mx-auto px-4">
         <div className="flex gap-8 py-20 lg:py-40 items-center justify-center flex-col">
           <div>
-            <Link href="#how-it-works" onClick={handleScrollToFeature}>
+            <Link href="#how-it-works" onClick={(e) => handleScrollToSection(e, 'how-it-works')}>
               <Button variant="secondary" size="sm" className="gap-4">
                 Learn how DupeDelete works <MoveRight className="w-4 h-4" />
               </Button>

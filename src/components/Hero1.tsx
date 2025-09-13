@@ -33,14 +33,25 @@ export const Hero1 = () => {
               Stop wasting storage on duplicate files. DupeDelete scans your folder, shows duplicates in a checklist, and lets you keep what you want — all in just a few clicks.
             </p>
           </div>
-          <div className="flex flex-row gap-3">
-            <Link href="/cleanup">
-              <Button size="lg" className="gap-4" variant="outline">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4"> {/* Changed to flex-col on small, flex-row on sm+ */}
+            <Link href="/cleanup" className="w-full sm:w-auto"> {/* Make link full width on small screens */}
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="gap-4 w-full 
+                           sm:px-4 sm:py-2 sm:text-sm 
+                           md:px-6 md:py-3 md:text-base" // Responsive sizing
+              >
                 Clean up to 100 files free
               </Button>
             </Link>
-            <Link href="/pricing">
-              <Button size="lg" className="gap-4">
+            <Link href="/pricing" className="w-full sm:w-auto"> {/* Make link full width on small screens */}
+              <Button 
+                size="lg" 
+                className="gap-4 w-full 
+                           sm:px-4 sm:py-2 sm:text-sm 
+                           md:px-6 md:py-3 md:text-base" // Responsive sizing
+              >
                 Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
               </Button>
             </Link>

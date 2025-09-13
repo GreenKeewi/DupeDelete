@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import imageHash from 'image-hash';
 import { v4 as uuidv4 } from 'uuid';
-import { Jimp } from 'jimp'; // Corrected: Import Jimp as a named export
+import { Jimp } from 'jimp'; // Fixed: Import Jimp as a named export
 import { ssim } from 'ssim.js'; // Import ssim.js for SSIM comparison
 
 export type FileType = 'image' | 'other';
@@ -97,17 +97,18 @@ async function getSsimSimilarity(imagePath1: string, imagePath2: string): Promis
     // Resize images to a common smaller dimension for faster SSIM calculation
     // and to handle slight resolution differences.
     const commonSize = 256; // e.g., 256x256
-    img1.resize({ width: commonSize, height: commonSize, mode: Jimp.RESIZE_BICUBIC });
-    img2.resize({ width: commonSize, height: commonSize, mode: Jimp.RESIZE_BICUBIC });
+    img1.resize(commonSize, commonSize, Jimp.RESIZE_BICUBIC);
+    img2.resize(commonSize, commonSize, Jimp.RESIZE_BICUBIC);
 
     // Convert to raw pixel data for ssim.js
+    // ssim.js expects Uint8ClampedArray for ImageData.data
     const data1 = {
-      data: new Uint8ClampedArray(img1.bitmap.data), // Corrected: Convert to Uint8ClampedArray
+      data: new Uint8ClampedArray(img1.bitmap.data), // Fixed: Convert to Uint8ClampedArray
       width: img1.bitmap.width,
       height: img1.bitmap.height,
     };
     const data2 = {
-      data: new Uint8ClampedArray(img2.bitmap.data), // Corrected: Convert to Uint8ClampedArray
+      data: new Uint8ClampedArray(img2.bitmap.data), // Fixed: Convert to Uint8ClampedArray
       width: img2.bitmap.width,
       height: img2.bitmap.height,
     };

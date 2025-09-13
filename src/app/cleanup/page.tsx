@@ -55,7 +55,7 @@ export default function CleanupPage() {
     setIsProcessing(true);
     setDuplicates([]); // Clear previous duplicates
     setSelectedForComparison(null); // Clear any previous comparison selection
-    toast.loading("Uploading and scanning for duplicates...", { id: "upload-scan" });
+    toast.loading("Uploading and scanning for duplicate images...", { id: "upload-scan" });
 
     // Process files to create preview URLs for images and assign unique IDs
     const processedFiles: DuplicateFile[] = await Promise.all(filesArray.map(async (file, index) => {
@@ -103,23 +103,23 @@ export default function CleanupPage() {
 
       setDuplicates(uniqueDuplicates);
       setIsProcessing(false);
-      toast.success("Scan complete! Review duplicates below.", { id: "upload-scan" });
+      toast.success("Scan complete! Review duplicate images below.", { id: "upload-scan" });
     }, 3000);
   };
 
   const handleDeleteAll = () => {
     setDuplicates([]); // Clear all duplicates
-    toast.success("All duplicates marked for deletion.");
+    toast.success("All duplicate images marked for deletion.");
   };
 
   const handleKeepFile = (id: string) => {
     setDuplicates(duplicates.filter(dup => dup.id !== id));
-    toast.info("File marked to keep.");
+    toast.info("Image marked to keep.");
   };
 
   const handleDeleteFile = (id: string) => {
     setDuplicates(duplicates.filter(dup => dup.id !== id)); // Remove from duplicates list
-    toast.success("File marked for deletion.");
+    toast.success("Image marked for deletion.");
   };
 
   const handleCompare = (duplicate: DuplicateFile) => {
@@ -129,7 +129,7 @@ export default function CleanupPage() {
         setSelectedForComparison({ original, duplicate });
         setIsCompareDialogOpen(true);
       } else {
-        toast.error("Original file for comparison not found.");
+        toast.error("Original image for comparison not found.");
       }
     } else {
       toast.info("This duplicate does not have a linked original for comparison in this mock.");
@@ -213,7 +213,7 @@ export default function CleanupPage() {
       {/* File Review Area */}
       <Card className="flex-1 p-6 space-y-6">
         <CardHeader>
-          <CardTitle className="text-2xl">Review Duplicates</CardTitle>
+          <CardTitle className="text-2xl">Review Duplicate Images</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button
@@ -221,14 +221,14 @@ export default function CleanupPage() {
             className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
             disabled={duplicates.length === 0 || isProcessing}
           >
-            <Trash2 className="mr-2 h-4 w-4" /> Delete All Duplicates
+            <Trash2 className="mr-2 h-4 w-4" /> Delete All Duplicate Images
           </Button>
 
           <div className="h-64 border rounded-md overflow-auto p-4 bg-background">
             {isProcessing ? (
-              <p className="text-center text-muted-foreground">Scanning for duplicates...</p>
+              <p className="text-center text-muted-foreground">Scanning for duplicate images...</p>
             ) : duplicates.length === 0 ? (
-              <p className="text-center text-muted-foreground">No duplicates found. Upload a folder to start.</p>
+              <p className="text-center text-muted-foreground">No duplicate images found. Upload a folder to start.</p>
             ) : (
               duplicates.map((dup) => (
                 <div key={dup.id} className="flex justify-between items-center border-b last:border-b-0 py-2">

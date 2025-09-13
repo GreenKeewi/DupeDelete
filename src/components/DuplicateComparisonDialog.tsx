@@ -55,14 +55,14 @@ export const DuplicateComparisonDialog: React.FC<DuplicateComparisonDialogProps>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl w-full p-6">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Compare Duplicates</DialogTitle>
+          <DialogTitle className="text-2xl">Compare Duplicate Images</DialogTitle>
           <DialogDescription>
-            Review the original file and its duplicate side-by-side.
+            Review the original image and its duplicate side-by-side.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col md:flex-row gap-4 mt-4">
-          {renderFileCard(originalFile, "Original File")}
-          {renderFileCard(duplicateFile, "Duplicate File")}
+          {renderFileCard(originalFile, "Original Image")}
+          {renderFileCard(duplicateFile, "Duplicate Image")}
         </div>
       </DialogContent>
     </Dialog>

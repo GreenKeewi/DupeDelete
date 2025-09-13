@@ -14,10 +14,10 @@ export const Feature1 = () => (
             </div>
             <div className="flex gap-2 flex-col">
               <h2 className="text-3xl lg:text-5xl tracking-tighter max-w-xl text-left font-regular">
-                Clean your files in 3 simple steps
+                Clean your images in 3 simple steps
               </h2>
               <p className="text-lg leading-relaxed tracking-tight text-muted-foreground max-w-xl text-left">
-                DupeDelete simplifies file management: upload your folder, review detected duplicates, and download your cleaned collection.
+                DupeDelete simplifies image management: upload your folder, review detected duplicate images, and download your cleaned collection.
               </p>
             </div>
           </div>
@@ -34,18 +34,18 @@ export const Feature1 = () => (
             <div className="flex flex-row gap-6 items-start">
               <Check className="w-4 h-4 mt-2 text-primary" />
               <div className="flex flex-col gap-1">
-                <p>Review duplicates</p>
+                <p>Review duplicate images</p>
                 <p className="text-muted-foreground text-sm">
-                  See a clear list of duplicates and decide which ones to keep or delete.
+                  See a clear list of duplicate images and decide which ones to keep or delete.
                 </p>
               </div>
             </div>
             <div className="flex flex-row gap-6 items-start">
               <Check className="w-4 h-4 mt-2 text-primary" />
               <div className="flex flex-col gap-1">
-                <p>Download cleaned files</p>
+                <p>Download cleaned images</p>
                 <p className="text-muted-foreground text-sm">
-                  Get a new, organized zip file with only the unique files you want.
+                  Get a new, organized zip file with only the unique images you want.
                 </p>
               </div>
             </div>

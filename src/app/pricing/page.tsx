@@ -56,8 +56,8 @@ export default function PricingPage() {
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">Perfect for occasional cleaning.</p>
             <ul className="space-y-2 text-sm">
-              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Clean up to 1,000 files</li>
-              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Standard duplicate detection</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Clean up to 1,000 images</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Standard duplicate image detection</li>
               <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Email support</li>
             </ul>
           </CardContent>
@@ -81,8 +81,8 @@ export default function PricingPage() {
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">For power users with large collections.</p>
             <ul className="space-y-2 text-sm">
-              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Unlimited file cleaning</li>
-              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Advanced duplicate detection</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Unlimited image cleaning</li>
+              <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Advanced duplicate image detection</li>
               <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Priority support</li>
               <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Future premium features</li>
             </ul>

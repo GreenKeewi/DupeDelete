@@ -30,27 +30,27 @@ export const Hero1 = () => {
               Clean Your Folders in Seconds
             </h1>
             <p className="text-lg md:text-xl leading-relaxed tracking-tight text-muted-foreground max-w-2xl text-center">
-              Stop wasting storage on duplicate files. DupeDelete scans your folder, shows duplicates in a checklist, and lets you keep what you want — all in just a few clicks.
+              Stop wasting storage on duplicate images. DupeDelete scans your folder, shows duplicate images in a checklist, and lets you keep what you want — all in just a few clicks.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4"> {/* Changed to flex-col on small, flex-row on sm+ */}
-            <Link href="/cleanup" className="w-full sm:w-auto"> {/* Make link full width on small screens */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Link href="/cleanup" className="w-full sm:w-auto">
               <Button 
                 size="lg" 
                 variant="outline" 
                 className="gap-4 w-full 
                            sm:px-4 sm:py-2 sm:text-sm 
-                           md:px-6 md:py-3 md:text-base" // Responsive sizing
+                           md:px-6 md:py-3 md:text-base"
               >
-                Clean up to 100 files free
+                Clean up to 100 images free
               </Button>
             </Link>
-            <Link href="/pricing" className="w-full sm:w-auto"> {/* Make link full width on small screens */}
+            <Link href="/pricing" className="w-full sm:w-auto">
               <Button 
                 size="lg" 
                 className="gap-4 w-full 
                            sm:px-4 sm:py-2 sm:text-sm 
-                           md:px-6 md:py-3 md:text-base" // Responsive sizing
+                           md:px-6 md:py-3 md:text-base"
               >
                 Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
               </Button>

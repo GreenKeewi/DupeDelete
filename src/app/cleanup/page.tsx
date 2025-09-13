@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
 import { ScannedFile } from "@/lib/duplicate-detection"; // Import ScannedFile type from backend
+import JSZip from "jszip"; // Import JSZip
 
 interface FrontendDuplicateFile {
   id: string;
@@ -60,14 +61,27 @@ export default function CleanupPage() {
     setUploadedFiles([]); // Clear previous uploaded files
     setSelectedForComparison(null); // Clear any previous comparison selection
     setJobId(null);
-    toast.loading("Uploading and scanning for duplicate images...", { id: "upload-scan" });
+    toast.loading("Zipping and uploading your folder...", { id: "upload-scan" });
+
+    const zip = new JSZip();
+    for (const file of filesArray) {
+      // Use webkitRelativePath for folder structure, fallback to name
+      const filePathInZip = file.webkitRelativePath || file.name;
+      zip.file(filePathInZip, file);
+    }
+
+    let zippedBlob: Blob;
+    try {
+      zippedBlob = await zip.generateAsync({ type: "blob" });
+    } catch (zipError) {
+      console.error("Error zipping files:", zipError);
+      toast.error("Failed to zip files for upload.", { id: "upload-scan" });
+      setIsProcessing(false);
+      return;
+    }
 
     const formData = new FormData();
-    // Create a dummy zip file on the client-side to send to the backend.
-    // In a real scenario, you might zip the folder client-side or handle individual file uploads.
-    // For this example, we'll simulate a single zip file upload.
-    const dummyZipBlob = new Blob(filesArray, { type: 'application/zip' });
-    formData.append('file', dummyZipBlob, 'uploaded_folder.zip');
+    formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
       const response = await fetch("/api/upload", {

@@ -24,12 +24,11 @@ interface FrontendDuplicateFile {
   relativePath: string; // Path relative to the extracted folder root
   type: "image" | "other";
   originalFileId?: string; // Link to its original for comparison
-  detectionMethod?: 'MD5' | 'pHash' | 'SSIM'; // New: How it was detected
 }
 
 export async function POST(req: Request) {
   if (req.method !== 'POST') {
-    return NextResponse.json({ success: false, error: 'Method Not Allowed' }, { status: 405 });
+    return new NextResponse(JSON.stringify({ message: 'Method Not Allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
   let tempZipPath: string | undefined;
@@ -51,15 +50,15 @@ export async function POST(req: Request) {
     if (normalizedSize) detectionConfig.normalizedSize = parseInt(normalizedSize);
 
     if (!file) {
-      return NextResponse.json({ success: false, error: 'No file uploaded.' }, { status: 400 });
+      return new NextResponse(JSON.stringify({ message: 'No file uploaded.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ success: false, error: `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.` }, { status: 413 });
+      return new NextResponse(JSON.stringify({ message: `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.` }), { status: 413, headers: { 'Content-Type': 'application/json' } });
     }
 
     if (file.type !== 'application/zip' && file.type !== 'application/x-zip-compressed') {
-      return NextResponse.json({ success: false, error: 'Only ZIP files are allowed.' }, { status: 400 });
+      return new NextResponse(JSON.stringify({ message: 'Only ZIP files are allowed.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     // Create a temporary directory for this job
@@ -91,11 +90,10 @@ export async function POST(req: Request) {
     if (filesToScan.length > 100) {
       // Clean up immediately if limit exceeded
       await cleanupTempDir(extractedDirPath);
-      return NextResponse.json({
-        success: false,
-        error: 'File limit exceeded. Please upgrade to clean more than 100 files.',
+      return new NextResponse(JSON.stringify({
+        message: 'File limit exceeded. Please upgrade to clean more than 100 files.',
         redirect: '/pricing',
-      }, { status: 403 });
+      }), { status: 403, headers: { 'Content-Type': 'application/json' } });
     }
 
     const filesWithRelativePaths = await Promise.all(filesToScan.map(async (fullPath) => {
@@ -138,7 +136,6 @@ export async function POST(req: Request) {
           relativePath: dup.relativePath,
           type: dup.type,
           originalFileId: group.original.id, // Link to the original file's ID
-          detectionMethod: dup.detectionMethod,
         });
       });
     }
@@ -148,12 +145,12 @@ export async function POST(req: Request) {
       await fsp.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err));
     }
 
-    return NextResponse.json({ success: true, data: { jobId, duplicateGroups: frontendDuplicates, allScannedFiles: allScannedFilesForFrontend } });
+    return NextResponse.json({ jobId, duplicateGroups: frontendDuplicates, allScannedFiles: allScannedFilesForFrontend });
   } catch (error) {
     console.error('Error processing upload:', error);
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }
-    return NextResponse.json({ success: false, error: (error as Error).message || 'Internal Server Error' }, { status: 500 });
+    return new NextResponse(JSON.stringify({ message: 'Internal Server Error', error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

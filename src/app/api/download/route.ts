@@ -6,7 +6,7 @@ import { getTempFilePath, cleanupTempDir } from '@/lib/file-utils';
 
 export async function POST(req: Request) {
   if (req.method !== "POST") {
-    return NextResponse.json({ success: false, error: "Method Not Allowed" }, { status: 405 });
+    return new NextResponse(JSON.stringify({ message: "Method Not Allowed" }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
   let extractedDirPath: string | undefined;
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     console.log("Files to keep for download:", filesToKeep);
 
     if (!jobId || !Array.isArray(filesToKeep)) {
-      return NextResponse.json({ success: false, error: "Invalid request body: jobId and filesToKeep are required." }, { status: 400 });
+      return new NextResponse(JSON.stringify({ message: "Invalid request body: jobId and filesToKeep are required." }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     extractedDirPath = path.join(process.env.TEMP_BASE_DIR || path.join(require('os').tmpdir(), 'dupe-delete-temp'), jobId + '-extracted-');
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("Error in /api/download:", error);
-    return NextResponse.json({ success: false, error: (error as Error).message || "Internal Server Error" }, { status: 500 });
+    return new NextResponse(JSON.stringify({ message: "Internal Server Error", error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   } finally {
     if (extractedDirPath) {
       // Clean up the temporary directory after download

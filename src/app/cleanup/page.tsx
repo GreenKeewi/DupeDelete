@@ -91,30 +91,16 @@ export default function CleanupPage() {
       });
 
       if (!response.ok) {
-        let errorData;
-        let errorMessage = `API returned ${response.status}`;
-        try {
-          errorData = await response.json();
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          if (response.status === 403 && errorData.redirect) {
-            toast.warning(errorMessage, { id: "upload-scan" });
-            router.push(errorData.redirect);
-            return;
-          }
-        } catch (jsonError) {
-          const text = await response.text(); // Read as text if JSON parsing fails (e.g., HTML error page)
-          console.error("Server error (non-JSON response):", text);
-          errorMessage = `API returned ${response.status}: ${text}`;
+        const errorData = await response.json();
+        if (response.status === 403 && errorData.redirect) {
+          toast.warning(errorData.message, { id: "upload-scan" });
+          router.push(errorData.redirect);
+          return;
         }
-        throw new Error(errorMessage);
+        throw new Error(errorData.message || "Failed to upload and scan files.");
       }
 
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || "Failed to upload and scan files.");
-      }
-
-      const { jobId, duplicateGroups, allScannedFiles } = result.data;
+      const { jobId, duplicateGroups, allScannedFiles } = await response.json();
       setJobId(jobId);
 
       // Create client-side preview URLs for all scanned image files
@@ -200,17 +186,7 @@ export default function CleanupPage() {
       });
 
       if (!response.ok) {
-        let errorData;
-        let errorMessage = `API returned ${response.status}`;
-        try {
-          errorData = await response.json();
-          errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch (jsonError) {
-          const text = await response.text(); // Read as text if JSON parsing fails (e.g., HTML error page)
-          console.error("Server error (non-JSON response during download):", text);
-          errorMessage = `API returned ${response.status}: ${text}`;
-        }
-        throw new Error(errorMessage);
+        throw new Error("Failed to download cleaned folder.");
       }
 
       const blob = await response.blob();
@@ -223,9 +199,9 @@ export default function CleanupPage() {
       a.remove();
       window.URL.revokeObjectURL(url);
       toast.success("Cleaned folder downloaded successfully!", { id: "download-zip" });
-    } catch (error: unknown) { // Cast error to unknown first, then to Error
+    } catch (error) {
       console.error("Download error:", error);
-      toast.error((error as Error).message || "Failed to download cleaned folder.", { id: "download-zip" });
+      toast.error("Failed to download cleaned folder.", { id: "download-zip" });
     }
   };
 

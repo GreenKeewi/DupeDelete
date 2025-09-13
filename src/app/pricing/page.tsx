@@ -8,7 +8,7 @@ import { Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-export const PricingSection = () => {
+export default function PricingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
@@ -44,7 +44,7 @@ export const PricingSection = () => {
   };
 
   return (
-    <div id="pricing-section" className="flex flex-col items-center justify-center">
+    <div id="pricing-section" className="flex flex-col items-center justify-center py-10 px-4">
       <h1 className="text-4xl font-bold text-center mb-4">Choose Your Plan</h1>
       <p className="text-lg text-muted-foreground text-center mb-8 max-w-2xl">
         Unlock unlimited cleaning and advanced features with our flexible plans.
@@ -120,4 +120,4 @@ export const PricingSection = () => {
       </div>
     </div>
   );
-};
+}

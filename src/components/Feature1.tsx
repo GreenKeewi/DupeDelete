@@ -2,7 +2,6 @@
 
 import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { PricingSection } from "@/components/PricingSection"; // Import the new PricingSection
 
 export const Feature1 = () => (
   <div id="how-it-works" className="w-full py-20 lg:py-40">
@@ -56,10 +55,7 @@ export const Feature1 = () => (
           <span className="text-sm">Preview coming soon</span>
         </div>
       </div>
-      {/* Render the PricingSection directly below the Feature1 content */}
-      <div className="mt-20"> {/* Add some margin for spacing */}
-        <PricingSection />
-      </div>
+      {/* The PricingSection is now a dedicated page, so it's no longer rendered here. */}
     </div>
   </div>
 );

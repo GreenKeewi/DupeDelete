@@ -6,16 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Download, Image as ImageIcon, Eye, AlertTriangle, FileWarning } from "lucide-react";
+import { Trash2, Download, Image as ImageIcon, Eye, AlertTriangle, FileWarning, FolderOpen } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
-import { ScannedFile, DuplicateGroup, SimilarImageGroup, ComprehensiveScanResult } from "@/types/detection"; // Import types from new file
+import { ScannedFile, DuplicateGroup, SimilarImageGroup, ComprehensiveScanResult } from "@/types/detection";
 import JSZip from "jszip";
 import { apiFetcher } from "@/lib/api-utils";
 
 // Frontend-specific types for display
 interface DisplayFile extends ScannedFile {
   previewUrl?: string; // For images, a URL to display the preview
-  originalFileId?: string; // Link to its original for comparison (for duplicates/similar)
 }
 
 export default function CleanupPage() {
@@ -25,15 +24,15 @@ export default function CleanupPage() {
   const [brokenFiles, setBrokenFiles] = useState<ScannedFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
-  const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
+  const [selectedForComparison, setSelectedForComparison] = useState<{ original: DisplayFile; duplicate: DisplayFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     return () => {
       allScannedFiles.forEach(file => {
-        if (file.type === "image" && file.fullPath.startsWith("blob:")) {
-          URL.revokeObjectURL(file.fullPath);
+        if (file.type === "image" && file.previewUrl && file.previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(file.previewUrl);
         }
       });
     };
@@ -170,7 +169,7 @@ export default function CleanupPage() {
     toast.success("Image marked for deletion.");
   };
 
-  const handleCompare = (originalFile: ScannedFile, duplicateFile: ScannedFile) => {
+  const handleCompare = (originalFile: DisplayFile, duplicateFile: DisplayFile) => {
     setSelectedForComparison({ original: originalFile, duplicate: duplicateFile });
     setIsCompareDialogOpen(true);
   };
@@ -247,7 +246,7 @@ export default function CleanupPage() {
     }
   };
 
-  const renderFileItem = (file: DisplayFile, groupType: 'duplicate' | 'similar', groupId: string, originalFile?: ScannedFile) => (
+  const renderFileItem = (file: DisplayFile, groupType: 'duplicate' | 'similar', groupId: string, originalFile?: DisplayFile) => (
     <div key={file.id} className="flex justify-between items-center border-b last:border-b-0 py-2">
       <div className="flex items-center gap-2">
         {file.type === "image" && file.previewUrl ? (
@@ -280,8 +279,10 @@ export default function CleanupPage() {
           <CardTitle className="text-2xl">Upload Your Folder</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4">
-          <Label htmlFor="folder-upload" className="cursor-pointer text-lg text-muted-foreground hover:text-foreground transition-colors">
-            Drag & drop a folder or click to select (zip or directory)
+          <Label htmlFor="folder-upload" className="cursor-pointer flex flex-col items-center gap-2 text-lg text-muted-foreground hover:text-foreground transition-colors p-8 rounded-lg border-2 border-dashed border-transparent hover:border-primary">
+            <FolderOpen className="h-12 w-12 text-primary" />
+            <span className="text-xl font-semibold">Drag & drop a folder here</span>
+            <span className="text-sm">or click to select a folder</span>
           </Label>
           <Input
             id="folder-upload"
@@ -344,7 +345,8 @@ export default function CleanupPage() {
                         <p className="font-medium text-sm mb-1">Original: {group.original.fileName}</p>
                         {group.duplicates.map(dup => {
                           const displayDup = allScannedFiles.find(f => f.id === dup.id);
-                          return displayDup ? renderFileItem(displayDup, 'duplicate', group.original.id, group.original) : null;
+                          const displayOriginal = allScannedFiles.find(f => f.id === group.original.id);
+                          return displayDup && displayOriginal ? renderFileItem(displayDup, 'duplicate', group.original.id, displayOriginal) : null;
                         })}
                       </div>
                     ))}
@@ -365,7 +367,8 @@ export default function CleanupPage() {
                         <p className="font-medium text-sm mb-1">Original: {group.original.fileName}</p>
                         {group.similar.map(sim => {
                           const displaySim = allScannedFiles.find(f => f.id === sim.id);
-                          return displaySim ? renderFileItem(displaySim, 'similar', group.original.id, group.original) : null;
+                          const displayOriginal = allScannedFiles.find(f => f.id === group.original.id);
+                          return displaySim && displayOriginal ? renderFileItem(displaySim, 'similar', group.original.id, displayOriginal) : null;
                         })}
                       </div>
                     ))}

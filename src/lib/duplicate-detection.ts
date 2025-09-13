@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import imageHash from 'image-hash';
 import { v4 as uuidv4 } from 'uuid';
-import { Jimp } from 'jimp'; // Changed to named import
+import { Jimp } from 'jimp'; // Changed back to named import
 import { ssim } from 'ssim.js'; // Import ssim.js for SSIM comparison
 
 export type FileType = 'image' | 'other';

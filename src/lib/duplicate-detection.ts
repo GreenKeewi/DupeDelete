@@ -3,8 +3,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import imageHash from 'image-hash';
 import { v4 as uuidv4 } from 'uuid';
-import { Jimp } from 'jimp';
-import { ssim } from 'ssim.js';
+import { Jimp } from 'jimp'; // Changed to named import as per TypeScript suggestion
+import { ssim } from 'ssim.js'; // Import ssim.js for SSIM comparison
 
 export type FileType = 'image' | 'other';
 
@@ -27,17 +27,9 @@ export interface DuplicateGroup {
   detectionMethod: 'MD5' | 'pHash' | 'SSIM'; // New: How this group was formed
 }
 
-// Export DetectionConfig interface
-export interface DetectionConfig {
-  similarityThreshold?: number; // For pHash Hamming distance
-  ssimThreshold?: number;     // For SSIM similarity
-  normalizedSize?: number;    // For image resizing before SSIM
-}
-
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
-const DEFAULT_SIMILARITY_THRESHOLD = 5; // Default Hamming distance threshold for image similarity (pHash)
-const DEFAULT_SSIM_THRESHOLD = 0.90; // Default SSIM similarity threshold
-const DEFAULT_NORMALIZED_SIZE = 256; // Default image normalization size for SSIM
+const SIMILARITY_THRESHOLD = 5; // Hamming distance threshold for image similarity (pHash)
+const SSIM_THRESHOLD = 0.90; // SSIM similarity threshold
 
 function isImageFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
@@ -63,6 +55,7 @@ async function getPerceptualHash(filePath: string): Promise<string> {
     }, (error: Error | null, data: string) => {
       if (error) {
         console.error(`Error generating perceptual hash for ${filePath}:`, error);
+        // Fallback to SHA256 if perceptual hashing fails, though this should ideally not happen for images
         getSha256Hash(filePath).then(resolve).catch(reject);
       } else {
         resolve(data);
@@ -71,21 +64,23 @@ async function getPerceptualHash(filePath: string): Promise<string> {
   });
 }
 
+// Helper to convert a hex character to a 4-bit binary string
 function hexToBinary(hexChar: string): string {
   return parseInt(hexChar, 16).toString(2).padStart(4, '0');
 }
 
+// Calculate Hamming distance between two hexadecimal hash strings
 function getHammingDistance(hash1: string, hash2: string): number {
   if (hash1.length !== hash2.length) {
     console.warn("Hashes have different lengths, cannot calculate Hamming distance accurately.");
-    return Infinity;
+    return Infinity; // Indicate a very large distance
   }
 
   let distance = 0;
   for (let i = 0; i < hash1.length; i++) {
     const bin1 = hexToBinary(hash1[i]);
     const bin2 = hexToBinary(hash2[i]);
-    for (let j = 0; j < 4; j++) {
+    for (let j = 0; j < 4; j++) { // Compare each bit in the 4-bit representation
       if (bin1[j] !== bin2[j]) {
         distance++;
       }
@@ -94,14 +89,21 @@ function getHammingDistance(hash1: string, hash2: string): number {
   return distance;
 }
 
-async function getSsimSimilarity(imagePath1: string, imagePath2: string, normalizedSize: number): Promise<number> {
+async function getSsimSimilarity(imagePath1: string, imagePath2: string): Promise<number> {
   try {
+    // Use type assertion to bypass TypeScript's check on 'read'
     const img1 = await (Jimp as any).read(imagePath1);
     const img2 = await (Jimp as any).read(imagePath2);
 
-    img1.resize(normalizedSize, normalizedSize, (Jimp as any).constants.RESIZE_BICUBIC);
-    img2.resize(normalizedSize, normalizedSize, (Jimp as any).constants.RESIZE_BICUBIC);
+    // Resize images to a common smaller dimension for faster SSIM calculation
+    // and to handle slight resolution differences.
+    const commonSize = 256; // e.g., 256x256
+    // Use type assertion to bypass TypeScript's check on 'constants'
+    img1.resize({ w: commonSize, h: commonSize, mode: (Jimp as any).constants.RESIZE_BICUBIC });
+    img2.resize({ w: commonSize, h: commonSize, mode: (Jimp as any).constants.RESIZE_BICUBIC });
 
+    // Convert to raw pixel data for ssim.js
+    // ssim.js expects Uint8ClampedArray for ImageData.data
     const data1 = {
       data: new Uint8ClampedArray(img1.bitmap.data),
       width: img1.bitmap.width,
@@ -114,29 +116,21 @@ async function getSsimSimilarity(imagePath1: string, imagePath2: string, normali
     };
 
     const { mssim } = ssim(data1, data2, {
-      windowSize: 11,
-      k1: 0.01,
-      k2: 0.03,
+      // Default options for ssim.js are usually fine
     });
     return mssim;
   } catch (error) {
     console.error(`Error calculating SSIM for ${imagePath1} and ${imagePath2}:`, error);
-    return 0;
+    return 0; // Return 0 on error to avoid false positives
   }
 }
 
 export async function scanFilesForDuplicates(
-  files: { fullPath: string; relativePath: string; size: number }[],
-  config?: DetectionConfig // Added optional config parameter
+  files: { fullPath: string; relativePath: string; size: number }[]
 ): Promise<DuplicateGroup[]> {
   const allScannedFiles: ScannedFile[] = [];
   const duplicateGroups: DuplicateGroup[] = [];
   const processedFileIds = new Set<string>();
-
-  // Use provided config values or fall back to defaults
-  const currentSimilarityThreshold = config?.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
-  const currentSsimThreshold = config?.ssimThreshold ?? DEFAULT_SSIM_THRESHOLD;
-  const currentNormalizedSize = config?.normalizedSize ?? DEFAULT_NORMALIZED_SIZE;
 
   // --- Pass 1: Initial scan and hashing (MD5 for all, pHash for images) ---
   for (const file of files) {
@@ -196,7 +190,7 @@ export async function scanFilesForDuplicates(
   );
 
   const pHashGroups: { original: ScannedFile; duplicates: ScannedFile[] }[] = [];
-  const pHashProcessedIdsInPass = new Set<string>();
+  const pHashProcessedIdsInPass = new Set<string>(); // To manage within this pass
 
   for (let i = 0; i < remainingImageFilesForPHash.length; i++) {
     const currentFile = remainingImageFilesForPHash[i];
@@ -214,7 +208,7 @@ export async function scanFilesForDuplicates(
 
       if (currentFile.pHash && compareFile.pHash) {
         const distance = getHammingDistance(currentFile.pHash, compareFile.pHash);
-        if (distance <= currentSimilarityThreshold) { // Use currentSimilarityThreshold
+        if (distance <= SIMILARITY_THRESHOLD) {
           currentGroup.duplicates.push(compareFile);
           pHashProcessedIdsInPass.add(compareFile.id);
         }
@@ -258,8 +252,8 @@ export async function scanFilesForDuplicates(
       const compareFile = remainingImageFilesForSSIM[j];
       if (ssimProcessedIdsInPass.has(compareFile.id)) continue;
 
-      const similarity = await getSsimSimilarity(currentFile.fullPath, compareFile.fullPath, currentNormalizedSize); // Pass normalizedSize
-      if (similarity >= currentSsimThreshold) { // Use currentSsimThreshold
+      const similarity = await getSsimSimilarity(currentFile.fullPath, compareFile.fullPath);
+      if (similarity >= SSIM_THRESHOLD) {
         ssimGroup.duplicates.push(compareFile);
         ssimProcessedIdsInPass.add(compareFile.id);
       }
@@ -267,7 +261,7 @@ export async function scanFilesForDuplicates(
 
     if (ssimGroup.duplicates.length > 0) {
       duplicateGroups.push({
-        hash: currentFile.md5Hash,
+        hash: currentFile.md5Hash, // Using MD5 as a fallback hash for the group
         original: currentFile,
         duplicates: ssimGroup.duplicates.map(d => ({ ...d, detectionMethod: 'SSIM' })),
         detectionMethod: 'SSIM',

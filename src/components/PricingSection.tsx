@@ -7,20 +7,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { useSession } from "@/components/SessionContextProvider";
-import { useSubscription } from "@/hooks/use-subscription"; // Import the new hook
+import { useSession } from "@/components/SessionContextProvider"; // Corrected import path
 
 export const PricingSection = () => {
   const router = useRouter();
-  const { user, isLoading: isSessionLoading } = useSession();
-  const { plan: currentPlan, isPro, isBasic, isLoading: isSubscriptionLoading } = useSubscription(); // Use the new hook
+  const { user, isLoading } = useSession(); // Get user and loading state from session
   const [loading, setLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
 
-  const isLoading = isSessionLoading || isSubscriptionLoading || loading;
-
-  const handleCheckout = async (selectedPlan: "basic" | "pro") => {
+  const handleCheckout = async (plan: "basic" | "pro") => {
     if (!user) {
+      // If not logged in, redirect to login page with a return URL
       toast.info("Please log in to subscribe.", { id: "login-redirect" });
       router.push(`/login?redirect_to=${encodeURIComponent('/pricing')}`);
       return;
@@ -28,14 +25,14 @@ export const PricingSection = () => {
 
     setLoading(true);
     const interval = isYearly ? "yearly" : "monthly";
-    toast.loading(`Initiating ${selectedPlan} ${interval} plan checkout...`, { id: "checkout" });
+    toast.loading(`Initiating ${plan} ${interval} plan checkout...`, { id: "checkout" });
     try {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ plan: selectedPlan, interval, userId: user.id }),
+        body: JSON.stringify({ plan, interval, userId: user.id }), // Pass userId to backend
       });
 
       if (!response.ok) {
@@ -53,20 +50,6 @@ export const PricingSection = () => {
       toast.error("Failed to start checkout. Please try again.", { id: "checkout" });
       setLoading(false);
     }
-  };
-
-  const getButtonText = (selectedPlan: "basic" | "pro") => {
-    if (isLoading) return "Loading...";
-    if (selectedPlan === "basic" && isBasic) return "Current Plan";
-    if (selectedPlan === "pro" && isPro) return "Current Plan";
-    return `Get ${selectedPlan === "basic" ? "Basic" : "Pro"} Plan (${isYearly ? "Yearly" : "Monthly"})`;
-  };
-
-  const isButtonDisabled = (selectedPlan: "basic" | "pro") => {
-    if (isLoading) return true;
-    if (selectedPlan === "basic" && isBasic) return true;
-    if (selectedPlan === "pro" && isPro) return true;
-    return false;
   };
 
   return (
@@ -109,9 +92,9 @@ export const PricingSection = () => {
             <Button
               className="w-full"
               onClick={() => handleCheckout("basic")}
-              disabled={isButtonDisabled("basic")}
+              disabled={loading || isLoading} // Disable if loading session or checkout
             >
-              {getButtonText("basic")}
+              {isLoading ? "Loading..." : (loading ? "Processing..." : `Get Basic Plan (${isYearly ? "Yearly" : "Monthly"})`)}
             </Button>
           </CardFooter>
         </Card>
@@ -137,9 +120,9 @@ export const PricingSection = () => {
             <Button
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => handleCheckout("pro")}
-              disabled={isButtonDisabled("pro")}
+              disabled={loading || isLoading} // Disable if loading session or checkout
             >
-              {getButtonText("pro")}
+              {isLoading ? "Loading..." : (loading ? "Processing..." : `Get Pro Plan (${isYearly ? "Yearly" : "Monthly"})`)}
             </Button>
           </CardFooter>
         </Card>

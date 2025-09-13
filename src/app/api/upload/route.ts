@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import path from 'path';
 import unzipper from 'unzipper';
 import { createTempDir, cleanupTempDir, getFilesInDir } from '@/lib/file-utils';
-import { scanFilesForDuplicates, DuplicateGroup as BackendDuplicateGroup, ScannedFile, DetectionConfig } from '@/lib/duplicate-detection';
+import { scanFilesForDuplicates, DuplicateGroup as BackendDuplicateGroup, ScannedFile } from '@/lib/duplicate-detection';
 
 // Declare module for unzipper is now in src/types/unzipper.d.ts
 
@@ -28,7 +28,7 @@ interface FrontendDuplicateFile {
 
 export async function POST(req: Request) {
   if (req.method !== 'POST') {
-    return new NextResponse(JSON.stringify({ message: 'Method Not Allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+    return new NextResponse('Method Not Allowed', { status: 405 });
   }
 
   let tempZipPath: string | undefined;
@@ -37,28 +37,17 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    
-    // Get detection configuration from query parameters
-    const url = new URL(req.url);
-    const similarityThreshold = url.searchParams.get('similarityThreshold');
-    const ssimThreshold = url.searchParams.get('ssimThreshold');
-    const normalizedSize = url.searchParams.get('normalizedSize');
-    
-    const detectionConfig: DetectionConfig = {};
-    if (similarityThreshold) detectionConfig.similarityThreshold = parseInt(similarityThreshold);
-    if (ssimThreshold) detectionConfig.ssimThreshold = parseFloat(ssimThreshold);
-    if (normalizedSize) detectionConfig.normalizedSize = parseInt(normalizedSize);
 
     if (!file) {
-      return new NextResponse(JSON.stringify({ message: 'No file uploaded.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      return new NextResponse('No file uploaded.', { status: 400 });
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return new NextResponse(JSON.stringify({ message: `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.` }), { status: 413, headers: { 'Content-Type': 'application/json' } });
+      return new NextResponse(`File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.`, { status: 413 });
     }
 
     if (file.type !== 'application/zip' && file.type !== 'application/x-zip-compressed') {
-      return new NextResponse(JSON.stringify({ message: 'Only ZIP files are allowed.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      return new NextResponse('Only ZIP files are allowed.', { status: 400 });
     }
 
     // Create a temporary directory for this job
@@ -106,7 +95,7 @@ export async function POST(req: Request) {
     }));
     console.log(`[Upload API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`, filesWithRelativePaths); // Added logging
 
-    const backendDuplicateGroups: BackendDuplicateGroup[] = await scanFilesForDuplicates(filesWithRelativePaths, detectionConfig);
+    const backendDuplicateGroups: BackendDuplicateGroup[] = await scanFilesForDuplicates(filesWithRelativePaths);
     console.log(`[Upload API] Duplicate groups found by backend (${backendDuplicateGroups.length}):`, backendDuplicateGroups); // Added logging
 
     // Format the duplicate groups for the frontend
@@ -151,6 +140,6 @@ export async function POST(req: Request) {
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }
-    return new NextResponse(JSON.stringify({ message: 'Internal Server Error', error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

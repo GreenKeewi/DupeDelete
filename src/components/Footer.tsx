@@ -11,14 +11,7 @@ export const Footer = () => {
           Built with ❤️. Powered by Next.js + Stripe.
         </p>
         <p>&copy; {currentYear} DupeDelete. All rights reserved.</p>
-        <div className="flex justify-center space-x-4 mt-2">
-          <Link href="/privacy" className="hover:text-foreground transition-colors">
-            Privacy Policy
-          </Link>
-          <Link href="/terms" className="hover:text-foreground transition-colors">
-            Terms of Service
-          </Link>
-        </div>
+      
       </div>
     </footer>
   );

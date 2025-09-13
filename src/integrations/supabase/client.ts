@@ -2,9 +2,15 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://ymbiaifjczxawhflbadd.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InltYmlhaWZqY3p4YXdoZmxiYWRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3MDU2NzYsImV4cCI6MjA3MzI4MTY3Nn0.iNEh1buR38iTE5a9m-bDW2wZwkpctgKoB2URBiDjS-A";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InltYmlhaWZqY3p4YXdoZmxiYWRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3MDU2NzYsImV4cCI6MjA3MzI4MTY3Nn0.iNEh1buR38iTE5a9m-bDW2wZwkpctkKoB2URBiDjS-A";
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
+// Client-side Supabase client (for browser use)
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Server-side Supabase client (for API routes/server components)
+// This client should use the service role key for elevated privileges (e.g., admin functions)
+// Ensure SUPABASE_SERVICE_ROLE_KEY is set in your environment variables for server-side use.
+export const createServerSupabaseClient = () => createClient(
+  SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role key for server-side
+);

@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
-import { supabase } from "@/integrations/supabase/client"; // Import Supabase client
+import { supabase, createServerSupabaseClient } from "@/integrations/supabase/client"; // Import both clients
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-08-27.basil",
@@ -46,8 +46,11 @@ export async function POST(req: Request) {
       return new NextResponse(JSON.stringify({ message: `Stripe price ID not configured for ${plan} ${interval} plan.` }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
-    // Get user's email from Supabase for Stripe customer creation
-    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(userId);
+    // Initialize server-side Supabase client
+    const serverSupabase = createServerSupabaseClient();
+
+    // Get user's email from Supabase for Stripe customer creation using the server-side client
+    const { data: { user }, error: userError } = await serverSupabase.auth.admin.getUserById(userId);
 
     if (userError || !user) {
       console.error("Error fetching user for Stripe checkout:", userError?.message);
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
     let customerId: string | undefined;
 
     // Check if user already has a stripe_customer_id in their profile or subscriptions
-    const { data: existingSubscription, error: subError } = await supabase
+    const { data: existingSubscription, error: subError } = await serverSupabase // Use serverSupabase here too
       .from('subscriptions')
       .select('stripe_customer_id')
       .eq('user_id', userId)

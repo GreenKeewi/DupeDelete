@@ -72,7 +72,7 @@ export async function POST(req: Request) {
 
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription: Stripe.Subscription = event.data.object as Stripe.Subscription;
         let updatedUserId = subscription.metadata.supabase_user_id; // Changed to 'let'
 
         if (!updatedUserId) {

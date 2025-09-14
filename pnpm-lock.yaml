@@ -201,6 +201,9 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.1.5(@types/react@19.1.5)
+      copy-webpack-plugin:
+        specifier: ^13.0.1
+        version: 13.0.1(webpack@5.99.9)
       postcss:
         specifier: ^8
         version: 8.5.3
@@ -1939,6 +1942,12 @@ packages:
     resolution: {integrity: sha512-9Kr/j4O16ISv8zBBhJoi4bXOYNTkFLOqSL3UDB0njXxCXNezjeyVrJyGOWtgfs/q2km1gwBcfH8q1yEGoMYunA==}
     engines: {node: '>=18'}
 
+  copy-webpack-plugin@13.0.1:
+    resolution: {integrity: sha512-J+YV3WfhY6W/Xf9h+J1znYuqTye2xkBUIGyTPWuBAT27qajBa5mR4f8WBmfDY3YjRftT2kqZZiLi1qf0H+UOFw==}
+    engines: {node: '>= 18.12.0'}
+    peerDependencies:
+      webpack: ^5.1.0
+
   core-util-is@1.0.2:
     resolution: {integrity: sha512-3lqz5YjWTYnW6dlDa5TLaTCcShfar1e40rmcJVwCBJC6mWlFuj0eCHIElmG1g5kyuJ/GD+8Wn4FFCcz4gJPfaQ==}
 
@@ -2156,6 +2165,15 @@ packages:
 
   fastq@1.19.1:
     resolution: {integrity: sha512-GwLTyxkCXjXbxqIhTsMI2Nui8huMPtnxg7krajPJAjnEG/iiOS7i+zCtWGZR9G0NBKbXKh6X9m9UIsYX/N6vvQ==}
+
+  fdir@6.5.0:
+    resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
+    engines: {node: '>=12.0.0'}
+    peerDependencies:
+      picomatch: ^3 || ^4
+    peerDependenciesMeta:
+      picomatch:
+        optional: true
 
   file-type@16.5.4:
     resolution: {integrity: sha512-/yFHK0aGjFEgDJjEKP0pWCplsPFPhwyfwevf/pVxiN0tmE4L9LmwWxWukdJSHdoCli4VgQLehjJtwQBnqmsKcw==}
@@ -2547,6 +2565,10 @@ packages:
   picomatch@2.3.1:
     resolution: {integrity: sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA==}
     engines: {node: '>=8.6'}
+
+  picomatch@4.0.3:
+    resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
+    engines: {node: '>=12'}
 
   pify@2.3.0:
     resolution: {integrity: sha512-udgsAY+fTnvv7kI7aaxbqwWNb0AHiB0qBO89PZKPkoTmGOgdbrHDKD+0B2X4uTfJ/FT1R09r9gTsjUjNJotuog==}
@@ -3003,6 +3025,10 @@ packages:
 
   tinycolor2@1.6.0:
     resolution: {integrity: sha512-XPaBkWQJdsf3pLKJV9p4qN/S+fm2Oj8AIPo1BTUhg5oxkvm9+SVEGFdhyOz7tTdUTfvxMiAs4sp6/eZO2Ew+pw==}
+
+  tinyglobby@0.2.15:
+    resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
+    engines: {node: '>=12.0.0'}
 
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
@@ -5456,6 +5482,15 @@ snapshots:
 
   cookie@1.0.2: {}
 
+  copy-webpack-plugin@13.0.1(webpack@5.99.9):
+    dependencies:
+      glob-parent: 6.0.2
+      normalize-path: 3.0.0
+      schema-utils: 4.3.2
+      serialize-javascript: 6.0.2
+      tinyglobby: 0.2.15
+      webpack: 5.99.9
+
   core-util-is@1.0.2: {}
 
   core-util-is@1.0.3: {}
@@ -5636,6 +5671,10 @@ snapshots:
   fastq@1.19.1:
     dependencies:
       reusify: 1.1.0
+
+  fdir@6.5.0(picomatch@4.0.3):
+    optionalDependencies:
+      picomatch: 4.0.3
 
   file-type@16.5.4:
     dependencies:
@@ -6026,6 +6065,8 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@2.3.1: {}
+
+  picomatch@4.0.3: {}
 
   pify@2.3.0: {}
 
@@ -6540,6 +6581,11 @@ snapshots:
   tiny-invariant@1.3.3: {}
 
   tinycolor2@1.6.0: {}
+
+  tinyglobby@0.2.15:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
 
   to-regex-range@5.0.1:
     dependencies:

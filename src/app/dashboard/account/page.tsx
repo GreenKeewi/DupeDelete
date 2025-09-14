@@ -3,12 +3,12 @@
 import { useSession } from "@/components/SessionContextProvider";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react"; // Import useState
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, Mail, CreditCard, CalendarDays } from "lucide-react";
+import { Loader2, Mail, CreditCard, CalendarDays, Trash2 } from "lucide-react"; // Import Trash2
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -23,7 +23,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"; // Assuming you have these Shadcn form components
+} from "@/components/ui/form";
 
 // Define Zod schema for profile form
 const ProfileFormSchema = z.object({
@@ -35,11 +35,12 @@ type ProfileFormValues = z.infer<typeof ProfileFormSchema>;
 
 export default function AccountPage() {
   const { user, isLoading: isSessionLoading } = useSession();
-  const { plan, status, currentPeriodEnd, isLoading: isSubscriptionLoading } = useSubscription();
+  const { plan, status, currentPeriodEnd, isBasic, isPro, isLoading: isSubscriptionLoading } = useSubscription();
   const router = useRouter();
   const [isProfileUpdating, setIsProfileUpdating] = useState(false);
   const [profileData, setProfileData] = useState<{ first_name: string | null; last_name: string | null } | null>(null);
   const [isProfileDataLoading, setIsProfileDataLoading] = useState(true);
+  const [isCancellingSubscription, setIsCancellingSubscription] = useState(false); // New state for cancellation
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(ProfileFormSchema),
@@ -131,6 +132,39 @@ export default function AccountPage() {
     toast.success("Stripe Customer Portal integration coming soon!", { id: "manage-sub" });
   };
 
+  const handleCancelSubscription = async () => {
+    if (!user) {
+      toast.error("You must be logged in to cancel a subscription.");
+      return;
+    }
+
+    setIsCancellingSubscription(true);
+    toast.loading("Cancelling your subscription...", { id: "cancel-sub" });
+
+    try {
+      const response = await fetch("/api/cancel-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to cancel subscription.");
+      }
+
+      toast.success("Subscription cancelled successfully!", { id: "cancel-sub" });
+      router.refresh(); // Refresh to update subscription status
+    } catch (error: any) {
+      console.error("Error cancelling subscription:", error);
+      toast.error(error.message || "Failed to cancel subscription. Please try again.", { id: "cancel-sub" });
+    } finally {
+      setIsCancellingSubscription(false);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-3xl mx-auto">
       <h1 className="text-4xl font-bold text-foreground mb-6">Account Settings</h1>
@@ -208,9 +242,24 @@ export default function AccountPage() {
               <p className="text-lg font-semibold text-muted-foreground mt-1">{currentPeriodEnd.toLocaleDateString()}</p>
             </div>
           )}
-          <Button onClick={handleManageSubscription} disabled={plan === 'free'}>
+          <Button onClick={handleManageSubscription} disabled={plan === 'free' || isCancellingSubscription}>
             Manage Subscription on Stripe
           </Button>
+          {(isBasic || isPro) && ( // Only show cancel button if on a paid plan
+            <Button
+              variant="destructive"
+              onClick={handleCancelSubscription}
+              disabled={isCancellingSubscription}
+              className="w-full"
+            >
+              {isCancellingSubscription ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Cancel Subscription
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

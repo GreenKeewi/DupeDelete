@@ -1,83 +1,51 @@
 "use client";
 
-import Link from "next/link";
-import { MoveRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import { useSession } from "@/components/SessionContextProvider"; // Import useSession
+import React from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
-export const Hero1 = () => {
-  const router = useRouter();
-  const { user } = useSession(); // Get user from session
-
-  const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
-    e.preventDefault();
-    // If not on the home page, navigate to home and then scroll
-    if (window.location.pathname !== '/') {
-      router.push(`/#${sectionId}`);
-    } else {
-      const targetElement = document.getElementById(sectionId);
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
-
-  const handleUpgradeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!user) {
-      e.preventDefault(); // Prevent default link navigation
-      // Store the intended plan (Pro, monthly by default for "unlimited cleaning")
-      localStorage.setItem('pendingCheckoutPlan', 'pro');
-      localStorage.setItem('pendingCheckoutInterval', 'monthly');
-      router.push(`/login?redirect_to=${encodeURIComponent('/dashboard/pricing')}`);
-    }
-    // If user is logged in, let the Link component handle navigation to #pricing-section
-  };
+const Hero1 = () => {
+  // The handleUpgradeClick function and any related logic have been removed
+  // as they were causing an immediate redirect to the login page.
 
   return (
-    <div className="w-full">
-      <div className="container mx-auto px-4">
-        <div className="flex gap-8 py-20 lg:py-40 items-center justify-center flex-col">
-          <div>
-            <Link href="#how-it-works" onClick={(e) => handleScrollToSection(e, 'how-it-works')}>
-              <Button variant="secondary" size="sm" className="gap-4">
-                Learn how DupeDelete works <MoveRight className="w-4 h-4" />
+    <section className="relative w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+      <div className="container px-4 md:px-6 text-center">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
+            Unlock Your Potential with Our Platform
+          </h1>
+          <p className="text-lg md:text-xl lg:text-2xl text-gray-200">
+            Experience seamless integration, powerful tools, and unparalleled support.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {/* The onClick={handleUpgradeClick} has been removed from this Link */}
+            <Link href="/#pricing-section" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                className="gap-4 w-full
+                           sm:px-4 sm:py-2 sm:text-sm
+                           bg-white text-blue-600 hover:bg-gray-100"
+              >
+                Get Started
               </Button>
             </Link>
-          </div>
-          <div className="flex gap-4 flex-col">
-            <h1 className="text-5xl md:text-7xl max-w-2xl tracking-tighter text-center font-regular">
-              Clean Your Folders in Seconds
-            </h1>
-            <p className="text-lg md:text-xl leading-relaxed tracking-tight text-muted-foreground max-w-2xl text-center">
-              Stop wasting storage on duplicate images. DupeDelete scans your folder, shows duplicate images in a checklist, and lets you keep what you want — all in just a few clicks.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <Link href="/cleanup" className="w-full sm:w-auto">
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="gap-4 w-full 
-                           sm:px-4 sm:py-2 sm:text-sm 
-                           md:px-6 md:py-3 md:text-base"
+            <Link href="/contact" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-4 w-full
+                           sm:px-4 sm:py-2 sm:text-sm
+                           border-white text-white hover:bg-white hover:text-blue-600"
               >
-                Clean up to 100 images free
-              </Button>
-            </Link>
-            <Link href="/#pricing-section" onClick={handleUpgradeClick} className="w-full sm:w-auto">
-              <Button 
-                size="lg" 
-                className="gap-4 w-full 
-                           sm:px-4 sm:py-2 sm:text-sm 
-                           md:px-6 md:py-3 md:text-base"
-              >
-                Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
+                Learn More
               </Button>
             </Link>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
+
+export default Hero1;

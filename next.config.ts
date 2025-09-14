@@ -16,16 +16,28 @@ const nextConfig: NextConfig = {
     // The error path expects the file at .next/server/app/api/upload/webp.wasm
     if (isServer) {
       config.plugins = config.plugins || [];
-      config.plugins.push(
-        new CopyWebpackPlugin({
-          patterns: [
-            {
-              from: "node_modules/@cwasm/webp/webp.wasm",
-              to: "app/api/upload/webp.wasm",
-            },
-          ],
-        })
-      );
+      const webpWasmPath = (() => {
+        try {
+          // Resolve path robustly so it works in different environments
+          return require.resolve("@cwasm/webp/webp.wasm");
+        } catch {
+          return null;
+        }
+      })();
+
+      if (webpWasmPath) {
+        config.plugins.push(
+          new CopyWebpackPlugin({
+            patterns: [
+              {
+                from: webpWasmPath,
+                to: "app/api/upload/webp.wasm",
+                noErrorOnMissing: true,
+              },
+            ],
+          })
+        );
+      }
     }
     return config;
   },

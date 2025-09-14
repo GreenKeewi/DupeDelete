@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { MoveRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
+import { useSession } from "@/components/SessionContextProvider"; // Import useSession
 
 export const Hero1 = () => {
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
+  const { user } = useSession(); // Get user from session
 
   const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
@@ -19,6 +21,17 @@ export const Hero1 = () => {
         targetElement.scrollIntoView({ behavior: 'smooth' });
       }
     }
+  };
+
+  const handleUpgradeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!user) {
+      e.preventDefault(); // Prevent default link navigation
+      // Store the intended plan (Pro, monthly by default for "unlimited cleaning")
+      localStorage.setItem('pendingCheckoutPlan', 'pro');
+      localStorage.setItem('pendingCheckoutInterval', 'monthly');
+      router.push(`/login?redirect_to=${encodeURIComponent('/dashboard/pricing')}`);
+    }
+    // If user is logged in, let the Link component handle navigation to #pricing-section
   };
 
   return (
@@ -52,7 +65,7 @@ export const Hero1 = () => {
                 Clean up to 100 images free
               </Button>
             </Link>
-            <Link href="/#pricing-section" onClick={(e) => handleScrollToSection(e, 'pricing-section')} className="w-full sm:w-auto">
+            <Link href="/#pricing-section" onClick={handleUpgradeClick} className="w-full sm:w-auto">
               <Button 
                 size="lg" 
                 className="gap-4 w-full 

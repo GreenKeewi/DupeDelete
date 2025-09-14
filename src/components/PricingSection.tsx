@@ -10,55 +10,28 @@ import { Label } from "@/components/ui/label";
 import { useSession } from "@/components/SessionContextProvider";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Badge } from "@/components/ui/badge";
+import { useCheckout } from "@/hooks/use-checkout"; // Import the new hook
 
 export const PricingSection = () => {
   const router = useRouter();
   const { user, isLoading: isSessionLoading } = useSession();
   const { plan: activePlan, isBasic, isPro, isLoading: isSubscriptionLoading } = useSubscription();
-  const [loading, setLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
+  const { initiateCheckout, isCheckoutLoading } = useCheckout({
+    user,
+    onLoadingChange: (loading) => setLoading(loading), // Pass loading state to local state
+  });
+  const [loading, setLoading] = useState(false); // Local loading state for UI
 
-  const isLoading = isSessionLoading || isSubscriptionLoading;
+  const isLoading = isSessionLoading || isSubscriptionLoading || loading; // Combine all loading states
 
   const handleCheckout = async (selectedPlan: "basic" | "pro") => {
-    if (!user) {
-      toast.info("Please log in to subscribe.", { id: "login-redirect" });
-      router.push(`/login?redirect_to=${encodeURIComponent('/dashboard/pricing')}`); // Redirect to dashboard pricing
-      return;
-    }
-
-    setLoading(true);
     const interval = isYearly ? "yearly" : "monthly";
-    toast.loading(`Initiating ${selectedPlan} ${interval} plan checkout...`, { id: "checkout" });
-    try {
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ plan: selectedPlan, interval, userId: user.id }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create checkout session.");
-      }
-
-      const { url } = await response.json();
-      if (url) {
-        router.push(url);
-      } else {
-        throw new Error("No checkout URL received.");
-      }
-    } catch (error) {
-      console.error("Stripe checkout error:", error);
-      toast.error("Failed to start checkout. Please try again.", { id: "checkout" });
-      setLoading(false);
-    }
+    await initiateCheckout(selectedPlan, interval);
   };
 
   const getButtonText = (planType: "basic" | "pro") => {
     if (isLoading) return "Loading...";
-    if (loading) return "Processing...";
     
     const currentPlanIdentifier = `${planType}_${isYearly ? 'yearly' : 'monthly'}`;
     if (activePlan === currentPlanIdentifier) {
@@ -90,7 +63,7 @@ export const PricingSection = () => {
   };
 
   return (
-    <div id="pricing-section" className="flex flex-col items-center justify-center w-full"> {/* Removed container and min-h styling */}
+    <div id="pricing-section" className="flex flex-col items-center justify-center w-full">
       <h1 className="text-4xl font-bold text-center mb-4">Choose Your Plan</h1>
       <p className="text-lg text-muted-foreground text-center mb-8 max-w-2xl">
         Unlock unlimited cleaning and advanced features with our flexible plans.
@@ -131,7 +104,7 @@ export const PricingSection = () => {
             <Button
               className="w-full"
               onClick={() => handleCheckout("basic")}
-              disabled={loading || isLoading || isPlanActive("basic")}
+              disabled={isLoading || isPlanActive("basic")}
             >
               {getButtonText("basic")}
             </Button>
@@ -161,7 +134,7 @@ export const PricingSection = () => {
             <Button
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => handleCheckout("pro")}
-              disabled={loading || isLoading || isPlanActive("pro")}
+              disabled={isLoading || isPlanActive("pro")}
             >
               {getButtonText("pro")}
             </Button>

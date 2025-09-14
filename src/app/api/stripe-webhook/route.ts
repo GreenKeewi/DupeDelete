@@ -73,25 +73,22 @@ export async function POST(req: Request) {
         return new NextResponse("User ID missing in metadata.", { status: 400 });
       }
 
-      console.log(`[Stripe Webhook] Attempting to verify user with ID: ${userId}`); // NEW LOG
+      console.log(`[Stripe Webhook] Attempting to verify user with ID: ${userId}`);
 
-      const { data: userData, error: userError } = await supabaseAdmin
-        .schema('auth')
-        .from('users')
-        .select('id')
-        .eq('id', userId)
-        .single();
+      // --- FIX: Use supabaseAdmin.auth.admin.getUserById() to correctly access auth.users ---
+      const { data: { user: supabaseUser }, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
 
       if (userError) {
-        console.error(`[Stripe Webhook] Error querying auth.users for ID ${userId}:`, JSON.stringify(userError, null, 2)); // NEW LOG
+        console.error(`[Stripe Webhook] Error querying auth.users for ID ${userId} using admin API:`, JSON.stringify(userError, null, 2));
         return new NextResponse(`Database Error during user verification: ${userError.message}`, { status: 500 });
       }
       
-      if (!userData) {
-        console.error(`[Stripe Webhook] User with ID ${userId} not found in auth.users after query. userData: ${JSON.stringify(userData)}`); // NEW LOG
+      if (!supabaseUser) {
+        console.error(`[Stripe Webhook] User with ID ${userId} not found in auth.users after admin API query.`);
         return new NextResponse(`User not found: ${userId}`, { status: 400 });
       }
-      console.log(`[Stripe Webhook] User with ID ${userId} successfully found in auth.users. userData: ${JSON.stringify(userData)}`); // NEW LOG
+      console.log(`[Stripe Webhook] User with ID ${userId} successfully found in auth.users. User email: ${supabaseUser.email}`);
+      // --- END FIX ---
 
       try {
         const stripeSubscription: any = await stripe.subscriptions.retrieve(subscriptionId);

@@ -73,9 +73,10 @@ export async function POST(req: Request) {
         return new NextResponse("User ID missing in metadata.", { status: 400 });
       }
 
-      // --- NEW: Verify user exists in auth.users table ---
+      // --- FIX: Explicitly query the 'auth' schema for the users table ---
       const { data: userData, error: userError } = await supabaseAdmin
-        .from('users') // Directly query auth.users table
+        .schema('auth') // Specify the 'auth' schema
+        .from('users')
         .select('id')
         .eq('id', userId)
         .single();
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
         console.error(`[Stripe Webhook] User with ID ${userId} not found in auth.users. Cannot create subscription.`, userError);
         return new NextResponse(`User not found: ${userId}`, { status: 400 });
       }
-      // --- END NEW ---
+      // --- END FIX ---
 
       try {
         const stripeSubscription: any = await stripe.subscriptions.retrieve(subscriptionId);

@@ -26,7 +26,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 export async function POST(req: Request) {
-  console.log("[Stripe Webhook] Received a request."); // <-- New log here
+  console.log("[Stripe Webhook] Received a request.");
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
   const sig = req.headers.get("stripe-signature");
   if (!sig) {
-    console.error("[Stripe Webhook] No Stripe signature header."); // Added log
+    console.error("[Stripe Webhook] No Stripe signature header.");
     return new NextResponse("No Stripe signature header.", { status: 400 });
   }
 
@@ -46,9 +46,9 @@ export async function POST(req: Request) {
   try {
     rawBody = await getRawBody(req.body as ReadableStream<Uint8Array>);
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-    console.log(`[Stripe Webhook] Event constructed: ${event.type}`); // Added log
+    console.log(`[Stripe Webhook] Event constructed: ${event.type}`);
   } catch (err: any) {
-    console.error(`[Stripe Webhook] Webhook signature verification failed: ${err.message}`); // Added log
+    console.error(`[Stripe Webhook] Webhook signature verification failed: ${err.message}`);
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
@@ -74,10 +74,16 @@ export async function POST(req: Request) {
       }
 
       try {
-        // Cast to any to bypass strict TypeScript checking for this specific object
         const stripeSubscription: any = await stripe.subscriptions.retrieve(subscriptionId);
         const priceId = stripeSubscription.items.data[0].price.id;
-        const currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000).toISOString();
+        
+        let currentPeriodEnd: string | null = null;
+        // Safely check if current_period_end is a valid number before converting
+        if (typeof stripeSubscription.current_period_end === 'number') {
+          currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000).toISOString();
+        } else {
+          console.warn(`[Stripe Webhook] current_period_end is not a valid number for subscription ${subscriptionId}. Value: ${stripeSubscription.current_period_end}`);
+        }
 
         let plan_id: string;
         if (priceId === process.env.STRIPE_BASIC_PRICE_ID) {
@@ -114,7 +120,7 @@ export async function POST(req: Request) {
         }
         console.log(`[Stripe Webhook] Subscription for user ${userId} successfully updated to ${plan_id} (${stripeSubscription.status}).`);
       } catch (retrieveError: any) {
-        console.error("[Stripe Webhook] Error retrieving Stripe subscription details or processing data:", retrieveError); // Updated log
+        console.error("[Stripe Webhook] Error retrieving Stripe subscription details or processing data:", retrieveError);
         return new NextResponse(`Stripe API Error: ${retrieveError.message}`, { status: 500 });
       }
       break;

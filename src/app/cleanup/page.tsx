@@ -80,7 +80,7 @@ export default function CleanupPageContent() {
           compression: "DEFLATE",
           compressionOptions: { level: 9 },
         },
-        (metadata) => { // Correct placement of onUpdate callback
+        (metadata) => {
           // Scale zipping progress to 50% of total perceived progress
           setUploadProgress(Math.floor(metadata.percent / 2));
         }
@@ -93,16 +93,37 @@ export default function CleanupPageContent() {
       return;
     }
 
-    // After zipping, set progress to indicate upload/server processing
-    setUploadProgress(50); // Zipping is done, now uploading and scanning
-
     const formData = new FormData();
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
-      const responseData = await fetchJson<{ jobId: string; duplicateGroups: FrontendDuplicateFile[]; allScannedFiles: ScannedFile[]; }>("/api/upload", {
-        method: "POST",
-        body: formData,
+      // Use XMLHttpRequest for upload progress
+      const responseData = await new Promise<{ jobId: string; duplicateGroups: FrontendDuplicateFile[]; allScannedFiles: ScannedFile[]; }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/upload");
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            // Scale upload progress from 50% to 90%
+            const percentCompleted = (event.loaded / event.total) * 40; // 40% of total progress (50% to 90%)
+            setUploadProgress(50 + Math.floor(percentCompleted));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            const errorData = JSON.parse(xhr.responseText);
+            reject(new Error(errorData.message || `API Error: ${xhr.status} ${xhr.statusText}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error("Network error or server unreachable."));
+        };
+
+        xhr.send(formData);
       });
 
       const { jobId, duplicateGroups, allScannedFiles } = responseData;

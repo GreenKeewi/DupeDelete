@@ -11,19 +11,25 @@ import { supabase } from "@/integrations/supabase/client"; // Import the shared 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect_to") || "/dashboard/pricing"; 
   const { user, isLoading: isSessionLoading } = useSession();
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null); // New state for the redirect URL
 
   useEffect(() => {
+    // This effect runs only on the client side
+    const paramRedirectTo = searchParams.get("redirect_to") || "/dashboard/pricing";
+    if (typeof window !== 'undefined') {
+      setRedirectUrl(`${window.location.origin}${paramRedirectTo}`);
+    }
+
     if (!isSessionLoading && user) {
-      router.push(redirectTo);
+      router.push(paramRedirectTo); // Use the paramRedirectTo directly for client-side navigation
     } else if (!isSessionLoading && !user) {
       setIsAuthLoading(false);
     }
-  }, [user, isSessionLoading, router, redirectTo]);
+  }, [user, isSessionLoading, router, searchParams]);
 
-  if (isAuthLoading || isSessionLoading) {
+  if (isAuthLoading || isSessionLoading || redirectUrl === null) { // Wait for redirectUrl to be set
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -52,7 +58,7 @@ export default function LoginPage() {
           }
           theme="dark"
           showLinks={true}
-          redirectTo={`${window.location.origin}${redirectTo}`}
+          redirectTo={redirectUrl} // Use the state variable here
         />
       </div>
     </div>

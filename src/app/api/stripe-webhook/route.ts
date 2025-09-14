@@ -1,7 +1,5 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
-import { Readable } from "stream";
-import { buffer } from "micro"; // Using micro's buffer for raw body parsing
 import { supabase } from "@/integrations/supabase/client";
 
 // Stripe needs the raw body for signature verification, so we disable Next.js's body parser.
@@ -24,7 +22,8 @@ async function getRawBody(readable: ReadableStream<Uint8Array>): Promise<Buffer>
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-08-27.basil",
+  // Changed API version to a stable, recent one to ensure type compatibility
+  apiVersion: "2024-06-20", 
 });
 
 export async function POST(req: Request) {
@@ -67,7 +66,7 @@ export async function POST(req: Request) {
       }
 
       // Fetch subscription details from Stripe
-      const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const priceId = stripeSubscription.items.data[0].price.id;
       const currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000).toISOString();
 

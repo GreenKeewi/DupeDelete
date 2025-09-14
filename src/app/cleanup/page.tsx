@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
+import { Trash2, Download, Image as ImageIcon, Eye, Loader2 } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
 import { ScannedFile } from "@/lib/duplicate-detection";
 import JSZip from "jszip";
-import { fetchJson } from "@/lib/api-utils"; // Import fetchJson
+import { fetchJson } from "@/lib/api-utils";
+import { Progress } from "@/components/ui/progress"; // Import Progress
 
 interface FrontendDuplicateFile {
   id: string;
@@ -22,13 +23,14 @@ interface FrontendDuplicateFile {
   detectionMethod?: 'MD5' | 'pHash' | 'SSIM';
 }
 
-export default function CleanupPageContent() { // Renamed to CleanupPageContent
+export default function CleanupPageContent() {
   const [uploadedFiles, setUploadedFiles] = useState<ScannedFile[]>([]);
   const [duplicates, setDuplicates] = useState<FrontendDuplicateFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
   const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0); // New state for upload progress
   const router = useRouter();
 
   useEffect(() => {
@@ -52,11 +54,12 @@ export default function CleanupPageContent() { // Renamed to CleanupPageContent
 
     if (filesArray.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
-      router.push("/dashboard/pricing"); // Redirect to dashboard pricing
+      router.push("/dashboard/pricing");
       return;
     }
 
     setIsProcessing(true);
+    setUploadProgress(0); // Reset progress
     setDuplicates([]);
     setUploadedFiles([]);
     setSelectedForComparison(null);
@@ -71,13 +74,27 @@ export default function CleanupPageContent() { // Renamed to CleanupPageContent
 
     let zippedBlob: Blob;
     try {
-      zippedBlob = await zip.generateAsync({ type: "blob" });
+      zippedBlob = await zip.generateAsync(
+        {
+          type: "blob",
+          compression: "DEFLATE",
+          compressionOptions: { level: 9 },
+        },
+        (metadata) => { // Correct placement of onUpdate callback
+          // Scale zipping progress to 50% of total perceived progress
+          setUploadProgress(Math.floor(metadata.percent / 2));
+        }
+      );
     } catch (zipError) {
       console.error("Error zipping files:", zipError);
       toast.error("Failed to zip files for upload.", { id: "upload-scan" });
       setIsProcessing(false);
+      setUploadProgress(0); // Reset progress on error
       return;
     }
+
+    // After zipping, set progress to indicate upload/server processing
+    setUploadProgress(50); // Zipping is done, now uploading and scanning
 
     const formData = new FormData();
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
@@ -111,17 +128,18 @@ export default function CleanupPageContent() { // Renamed to CleanupPageContent
       setDuplicates(formattedDuplicates);
 
       toast.success("Scan complete! Review duplicate images below.", { id: "upload-scan" });
+      setUploadProgress(100); // Briefly show 100% on success
     } catch (error: any) {
       console.error("Upload error:", error);
-      // Check if the error message indicates a redirect for pricing
       if (error.message.includes("File limit exceeded") && error.message.includes("upgrade")) {
         toast.warning(error.message, { id: "upload-scan" });
-        router.push("/dashboard/pricing"); // Redirect to pricing page
+        router.push("/dashboard/pricing");
       } else {
         toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
       }
     } finally {
       setIsProcessing(false);
+      setUploadProgress(0); // Reset progress
     }
   };
 
@@ -200,31 +218,42 @@ export default function CleanupPageContent() { // Renamed to CleanupPageContent
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6"> {/* Removed container and min-h styling */}
+    <div className="flex flex-col lg:flex-row gap-6">
       {/* Upload Area */}
       <Card className="flex-1 p-6 flex flex-col items-center justify-center text-center border-2 border-dashed border-border bg-muted/20">
         <CardHeader>
           <CardTitle className="text-2xl">Upload Your Folder</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4">
-          <Label htmlFor="folder-upload" className="cursor-pointer text-lg text-muted-foreground hover:text-foreground transition-colors">
-            Drag & drop a folder or click to select (zip or directory)
-          </Label>
-          <Input
-            id="folder-upload"
-            type="file"
-            // @ts-ignore - webkitdirectory is a non-standard attribute
-            webkitdirectory="true"
-            directory=""
-            multiple
-            onChange={handleUpload}
-            className="hidden"
-          />
-          <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
-          {uploadedFiles.length > 0 && (
-            <p className="text-sm text-primary">
-              {uploadedFiles.length} files selected.
-            </p>
+          {isProcessing ? (
+            <div className="flex flex-col items-center gap-4 w-full">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Processing files...</p>
+              <Progress value={uploadProgress} className="w-3/4 h-2" />
+              <p className="text-sm text-muted-foreground">{uploadProgress}%</p>
+            </div>
+          ) : (
+            <>
+              <Label htmlFor="folder-upload" className="cursor-pointer text-lg text-muted-foreground hover:text-foreground transition-colors">
+                Drag & drop a folder or click to select (zip or directory)
+              </Label>
+              <Input
+                id="folder-upload"
+                type="file"
+                // @ts-ignore - webkitdirectory is a non-standard attribute
+                webkitdirectory="true"
+                directory=""
+                multiple
+                onChange={handleUpload}
+                className="hidden"
+              />
+              <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
+              {uploadedFiles.length > 0 && (
+                <p className="text-sm text-primary">
+                  {uploadedFiles.length} files selected.
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

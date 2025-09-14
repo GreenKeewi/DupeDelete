@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const priceId = stripeSubscription.items.data[0].price.id;
       // Asserting type for current_period_end to resolve TypeScript error
-      const currentPeriodEnd = new Date((stripeSubscription.current_period_end as number) * 1000).toISOString();
+      const currentPeriodEnd = new Date(((stripeSubscription as any).current_period_end as number) * 1000).toISOString();
 
       // Determine plan_id based on Stripe Price ID
       let plan_id: string;

@@ -9,7 +9,7 @@ export interface UserSubscriptionData {
   user_id: string;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
-  status: string;
+  status: string; // This will be the raw status from Stripe (e.g., 'active', 'trialing', 'canceled')
   plan_id: string;
   current_period_end: string | null;
   created_at: string;
@@ -59,7 +59,7 @@ export const useSubscription = (): UserSubscription => {
           user_id: user.id,
           stripe_customer_id: null,
           stripe_subscription_id: null,
-          status: 'free',
+          status: 'free', // Explicitly set to 'free' for non-existent subscriptions
           plan_id: 'free',
           current_period_end: null,
           created_at: new Date().toISOString(),
@@ -83,15 +83,39 @@ export const useSubscription = (): UserSubscription => {
   }, [user, isSessionLoading]);
 
   const plan = subscription?.plan_id || 'free';
-  const status = subscription?.status === 'active' ? 'active' : 'free'; // Simplify status for frontend
-  const isPro = plan.startsWith('pro') && status === 'active';
-  const isBasic = plan.startsWith('basic') && status === 'active';
-  const isFree = !isPro && !isBasic;
+  let effectiveStatus: UserSubscription['status'];
+
+  if (!subscription || subscription.plan_id === 'free') {
+    effectiveStatus = 'free';
+  } else {
+    // Map Stripe statuses to our simplified frontend statuses
+    switch (subscription.status) {
+      case 'active':
+      case 'trialing': // Treat 'trialing' as an active state
+        effectiveStatus = 'active';
+        break;
+      case 'canceled':
+        effectiveStatus = 'cancelled'; // Match our interface
+        break;
+      case 'past_due':
+        effectiveStatus = 'past_due';
+        break;
+      case 'unpaid':
+        effectiveStatus = 'unpaid';
+        break;
+      default:
+        effectiveStatus = 'free'; // Fallback for any unhandled Stripe statuses
+    }
+  }
+
+  const isPro = plan.startsWith('pro') && effectiveStatus === 'active';
+  const isBasic = plan.startsWith('basic') && effectiveStatus === 'active';
+  const isFree = effectiveStatus === 'free';
   const currentPeriodEnd = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
 
   return {
     plan: plan as UserSubscription['plan'],
-    status: status as UserSubscription['status'],
+    status: effectiveStatus,
     isPro,
     isBasic,
     isFree,

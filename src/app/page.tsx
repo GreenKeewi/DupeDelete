@@ -1,8 +1,8 @@
 import { MadeWithDyad } from "@/components/made-with-dyad";
-import { Hero1 } from "@/components/Hero1";
+import Hero1 from "@/components/Hero1"; // Changed to default import
 import { Feature1 } from "@/components/Feature1";
-import { Testimonials1 } from "@/components/Testimonials1"; // Import the new Testimonials1 component
-import { PricingSection } from "@/components/PricingSection"; // Import PricingSection directly
+import { Testimonials1 } from "@/components/Testimonials1";
+import { PricingSection } from "@/components/PricingSection";
 
 export default function Home() {
   return (
@@ -10,9 +10,9 @@ export default function Home() {
       <main className="flex-1 flex flex-col items-center justify-center">
         <Hero1 />
         <Feature1 />
-        <Testimonials1 /> {/* New testimonials block */}
-        <div className="mt-20"> {/* Add some margin for spacing */}
-          <PricingSection /> {/* Repositioned PricingSection */}
+        <Testimonials1 />
+        <div className="mt-20">
+          <PricingSection />
         </div>
       </main>
       <MadeWithDyad />

@@ -7,20 +7,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: Request) {
   if (req.method !== "POST") {
-    return NextResponse.json({ message: "Method Not Allowed" }, { status: 405 });
+    return new NextResponse("Method Not Allowed", { status: 405 });
   }
 
   try {
     const { plan, interval, userId } = await req.json(); // Get interval and userId from request body
 
     if (!plan || (plan !== "basic" && plan !== "pro")) {
-      return NextResponse.json({ message: "Invalid plan specified" }, { status: 400 });
+      return new NextResponse("Invalid plan specified", { status: 400 });
     }
     if (!interval || (interval !== "monthly" && interval !== "yearly")) {
-      return NextResponse.json({ message: "Invalid interval specified" }, { status: 400 });
+      return new NextResponse("Invalid interval specified", { status: 400 });
     }
     if (!userId) {
-      return NextResponse.json({ message: "User ID is required for checkout." }, { status: 400 });
+      return new NextResponse("User ID is required for checkout.", { status: 400 });
     }
 
     let priceId: string | undefined;
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
     if (!priceId) {
       console.error(`Stripe price ID not configured for plan: ${plan} and interval: ${interval}`);
-      return NextResponse.json({ message: `Stripe price ID not configured for ${plan} ${interval} plan.` }, { status: 500 });
+      return new NextResponse(`Stripe price ID not configured for ${plan} ${interval} plan.`, { status: 500 });
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -60,6 +60,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("Stripe checkout session creation failed:", error);
-    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

@@ -6,12 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Download, Image as ImageIcon, Eye, Loader2 } from "lucide-react";
+import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
 import { ScannedFile } from "@/lib/duplicate-detection";
 import JSZip from "jszip";
-import { fetchJson } from "@/lib/api-utils";
-import { Progress } from "@/components/ui/progress"; // Import Progress
 
 interface FrontendDuplicateFile {
   id: string;
@@ -23,14 +21,13 @@ interface FrontendDuplicateFile {
   detectionMethod?: 'MD5' | 'pHash' | 'SSIM';
 }
 
-export default function CleanupPageContent() {
+export default function CleanupPageContent() { // Renamed to CleanupPageContent
   const [uploadedFiles, setUploadedFiles] = useState<ScannedFile[]>([]);
   const [duplicates, setDuplicates] = useState<FrontendDuplicateFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
   const [selectedForComparison, setSelectedForComparison] = useState<{ original: ScannedFile; duplicate: ScannedFile } | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0); // New state for upload progress
   const router = useRouter();
 
   useEffect(() => {
@@ -54,12 +51,11 @@ export default function CleanupPageContent() {
 
     if (filesArray.length > 100) {
       toast.warning("You've reached the free limit. Redirecting to upgrade options.");
-      router.push("/dashboard/pricing");
+      router.push("/dashboard/pricing"); // Redirect to dashboard pricing
       return;
     }
 
     setIsProcessing(true);
-    setUploadProgress(0); // Reset progress
     setDuplicates([]);
     setUploadedFiles([]);
     setSelectedForComparison(null);
@@ -74,22 +70,11 @@ export default function CleanupPageContent() {
 
     let zippedBlob: Blob;
     try {
-      zippedBlob = await zip.generateAsync(
-        {
-          type: "blob",
-          compression: "DEFLATE",
-          compressionOptions: { level: 9 },
-        },
-        (metadata) => {
-          // Scale zipping progress to 50% of total perceived progress
-          setUploadProgress(Math.floor(metadata.percent / 2));
-        }
-      );
+      zippedBlob = await zip.generateAsync({ type: "blob" });
     } catch (zipError) {
       console.error("Error zipping files:", zipError);
       toast.error("Failed to zip files for upload.", { id: "upload-scan" });
       setIsProcessing(false);
-      setUploadProgress(0); // Reset progress on error
       return;
     }
 
@@ -97,36 +82,22 @@ export default function CleanupPageContent() {
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
-      // Use XMLHttpRequest for upload progress
-      const responseData = await new Promise<{ jobId: string; duplicateGroups: FrontendDuplicateFile[]; allScannedFiles: ScannedFile[]; }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/upload");
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            // Scale upload progress from 50% to 90%
-            const percentCompleted = (event.loaded / event.total) * 40; // 40% of total progress (50% to 90%)
-            setUploadProgress(50 + Math.floor(percentCompleted));
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(JSON.parse(xhr.responseText));
-          } else {
-            const errorData = JSON.parse(xhr.responseText);
-            reject(new Error(errorData.message || `API Error: ${xhr.status} ${xhr.statusText}`));
-          }
-        };
-
-        xhr.onerror = () => {
-          reject(new Error("Network error or server unreachable."));
-        };
-
-        xhr.send(formData);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
       });
 
-      const { jobId, duplicateGroups, allScannedFiles } = responseData;
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 403 && errorData.redirect) {
+          toast.warning(errorData.message, { id: "upload-scan" });
+          router.push("/dashboard/pricing"); // Redirect to dashboard pricing
+          return;
+        }
+        throw new Error(errorData.message || "Failed to upload and scan files.");
+      }
+
+      const { jobId, duplicateGroups, allScannedFiles } = await response.json();
       setJobId(jobId);
 
       const filesWithPreviews: ScannedFile[] = allScannedFiles.map((file: ScannedFile) => {
@@ -149,18 +120,11 @@ export default function CleanupPageContent() {
       setDuplicates(formattedDuplicates);
 
       toast.success("Scan complete! Review duplicate images below.", { id: "upload-scan" });
-      setUploadProgress(100); // Briefly show 100% on success
     } catch (error: any) {
       console.error("Upload error:", error);
-      if (error.message.includes("File limit exceeded") && error.message.includes("upgrade")) {
-        toast.warning(error.message, { id: "upload-scan" });
-        router.push("/dashboard/pricing");
-      } else {
-        toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
-      }
+      toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
     } finally {
       setIsProcessing(false);
-      setUploadProgress(0); // Reset progress
     }
   };
 
@@ -216,10 +180,7 @@ export default function CleanupPageContent() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text(); // Get raw text for debugging
-        console.error("Download API error response:", errorText);
-        toast.error("Failed to download cleaned folder. Check console for details.", { id: "download-zip" });
-        return;
+        throw new Error("Failed to download cleaned folder.");
       }
 
       const blob = await response.blob();
@@ -239,42 +200,31 @@ export default function CleanupPageContent() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
+    <div className="flex flex-col lg:flex-row gap-6"> {/* Removed container and min-h styling */}
       {/* Upload Area */}
       <Card className="flex-1 p-6 flex flex-col items-center justify-center text-center border-2 border-dashed border-border bg-muted/20">
         <CardHeader>
           <CardTitle className="text-2xl">Upload Your Folder</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4">
-          {isProcessing ? (
-            <div className="flex flex-col items-center gap-4 w-full">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-muted-foreground">Processing files...</p>
-              <Progress value={uploadProgress} className="w-3/4 h-2" />
-              <p className="text-sm text-muted-foreground">{uploadProgress}%</p>
-            </div>
-          ) : (
-            <>
-              <Label htmlFor="folder-upload" className="cursor-pointer text-lg text-muted-foreground hover:text-foreground transition-colors">
-                Drag & drop a folder or click to select (zip or directory)
-              </Label>
-              <Input
-                id="folder-upload"
-                type="file"
-                // @ts-ignore - webkitdirectory is a non-standard attribute
-                webkitdirectory="true"
-                directory=""
-                multiple
-                onChange={handleUpload}
-                className="hidden"
-              />
-              <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
-              {uploadedFiles.length > 0 && (
-                <p className="text-sm text-primary">
-                  {uploadedFiles.length} files selected.
-                </p>
-              )}
-            </>
+          <Label htmlFor="folder-upload" className="cursor-pointer text-lg text-muted-foreground hover:text-foreground transition-colors">
+            Drag & drop a folder or click to select (zip or directory)
+          </Label>
+          <Input
+            id="folder-upload"
+            type="file"
+            // @ts-ignore - webkitdirectory is a non-standard attribute
+            webkitdirectory="true"
+            directory=""
+            multiple
+            onChange={handleUpload}
+            className="hidden"
+          />
+          <p className="text-sm text-muted-foreground">Free limit: 100 files</p>
+          {uploadedFiles.length > 0 && (
+            <p className="text-sm text-primary">
+              {uploadedFiles.length} files selected.
+            </p>
           )}
         </CardContent>
       </Card>

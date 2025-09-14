@@ -28,7 +28,7 @@ interface FrontendDuplicateFile {
 
 export async function POST(req: Request) {
   if (req.method !== 'POST') {
-    return NextResponse.json({ message: "Method Not Allowed" }, { status: 405 });
+    return new NextResponse('Method Not Allowed', { status: 405 });
   }
 
   let tempZipPath: string | undefined;
@@ -39,15 +39,15 @@ export async function POST(req: Request) {
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json({ message: 'No file uploaded.' }, { status: 400 });
+      return new NextResponse('No file uploaded.', { status: 400 });
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ message: `File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.` }, { status: 413 });
+      return new NextResponse(`File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.`, { status: 413 });
     }
 
     if (file.type !== 'application/zip' && file.type !== 'application/x-zip-compressed') {
-      return NextResponse.json({ message: 'Only ZIP files are allowed.' }, { status: 400 });
+      return new NextResponse('Only ZIP files are allowed.', { status: 400 });
     }
 
     // Create a temporary directory for this job
@@ -79,10 +79,10 @@ export async function POST(req: Request) {
     if (filesToScan.length > 100) {
       // Clean up immediately if limit exceeded
       await cleanupTempDir(extractedDirPath);
-      return NextResponse.json({
+      return new NextResponse(JSON.stringify({
         message: 'File limit exceeded. Please upgrade to clean more than 100 files.',
         redirect: '/pricing',
-      }, { status: 403 });
+      }), { status: 403, headers: { 'Content-Type': 'application/json' } });
     }
 
     const filesWithRelativePaths = await Promise.all(filesToScan.map(async (fullPath) => {
@@ -140,6 +140,6 @@ export async function POST(req: Request) {
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }
-    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

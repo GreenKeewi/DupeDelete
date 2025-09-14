@@ -73,19 +73,25 @@ export async function POST(req: Request) {
         return new NextResponse("User ID missing in metadata.", { status: 400 });
       }
 
-      // --- FIX: Explicitly query the 'auth' schema for the users table ---
+      console.log(`[Stripe Webhook] Attempting to verify user with ID: ${userId}`); // NEW LOG
+
       const { data: userData, error: userError } = await supabaseAdmin
-        .schema('auth') // Specify the 'auth' schema
+        .schema('auth')
         .from('users')
         .select('id')
         .eq('id', userId)
         .single();
 
-      if (userError || !userData) {
-        console.error(`[Stripe Webhook] User with ID ${userId} not found in auth.users. Cannot create subscription.`, userError);
+      if (userError) {
+        console.error(`[Stripe Webhook] Error querying auth.users for ID ${userId}:`, JSON.stringify(userError, null, 2)); // NEW LOG
+        return new NextResponse(`Database Error during user verification: ${userError.message}`, { status: 500 });
+      }
+      
+      if (!userData) {
+        console.error(`[Stripe Webhook] User with ID ${userId} not found in auth.users after query. userData: ${JSON.stringify(userData)}`); // NEW LOG
         return new NextResponse(`User not found: ${userId}`, { status: 400 });
       }
-      // --- END FIX ---
+      console.log(`[Stripe Webhook] User with ID ${userId} successfully found in auth.users. userData: ${JSON.stringify(userData)}`); // NEW LOG
 
       try {
         const stripeSubscription: any = await stripe.subscriptions.retrieve(subscriptionId);

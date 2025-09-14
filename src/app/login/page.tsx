@@ -1,14 +1,39 @@
 "use client";
 
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { supabase } from '@/integrations/supabase/client';
-import { useSearchParams } from 'next/navigation'; // Import useSearchParams
+import { Auth } from "@supabase/auth-ui-react";
+import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/supabase";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "@/components/SessionContextProvider";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
+  const supabase = createClientComponentClient<Database>();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  // Default to /dashboard if no redirect_to is specified
-  const redirectTo = searchParams.get('redirect_to') || '/dashboard'; 
+  // Set default redirect to /dashboard/pricing if no specific redirect_to is provided
+  const redirectTo = searchParams.get("redirect_to") || "/dashboard/pricing"; 
+  const { user, isLoading: isSessionLoading } = useSession();
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isSessionLoading && user) {
+      router.push(redirectTo);
+    } else if (!isSessionLoading && !user) {
+      setIsAuthLoading(false);
+    }
+  }, [user, isSessionLoading, router, redirectTo]);
+
+  if (isAuthLoading || isSessionLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading authentication...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -22,14 +47,15 @@ export default function LoginPage() {
             variables: {
               default: {
                 colors: {
-                  brand: 'hsl(var(--primary))',
-                  brandAccent: 'hsl(var(--primary-foreground))',
+                  brand: "hsl(var(--primary))",
+                  brandAccent: "hsl(var(--primary-foreground))",
                 },
               },
             },
           }}
-          theme="light"
-          redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}${redirectTo}`} // Use the dynamic redirectTo URL
+          theme="dark"
+          showLinks={true}
+          redirectTo={`${window.location.origin}${redirectTo}`}
         />
       </div>
     </div>

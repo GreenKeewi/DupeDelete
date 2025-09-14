@@ -24,14 +24,11 @@ export const Hero1 = () => {
   };
 
   const handleUpgradeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!user) {
-      e.preventDefault(); // Prevent default link navigation
-      // Store the intended plan (Pro, monthly by default for "unlimited cleaning")
-      localStorage.setItem('pendingCheckoutPlan', 'pro');
-      localStorage.setItem('pendingCheckoutInterval', 'monthly');
-      router.push(`/login?redirect_to=${encodeURIComponent('/dashboard/pricing')}`);
-    }
-    // If user is logged in, let the Link component handle navigation to #pricing-section
+    // Always scroll to the pricing section first.
+    // The logic for redirecting to login (if not authenticated)
+    // and then resuming checkout will be handled by the PricingSection
+    // component's `useCheckout` hook when a plan is actually selected.
+    handleScrollToSection(e, 'pricing-section');
   };
 
   return (

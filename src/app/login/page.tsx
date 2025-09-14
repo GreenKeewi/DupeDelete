@@ -1,12 +1,12 @@
 "use client";
 
-import NextDynamic from "next/dynamic";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/components/SessionContextProvider";
-import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client"; // Import the shared Supabase client
+import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { Loader2 } from "lucide-react";
+import NextDynamic from "next/dynamic";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // Avoid SSR/prerender of the Auth UI by dynamically importing it on the client only
 const SupabaseAuth = NextDynamic(
@@ -16,7 +16,7 @@ const SupabaseAuth = NextDynamic(
 
 // Force this page to be dynamic so Next.js/Netlify doesn't try to prerender it at build time
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// export const revalidate = 0; // Removed this line
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,8 +27,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     // This effect runs only on the client side
-    const paramRedirectTo = searchParams.get("redirect_to") || "/dashboard/pricing";
-    if (typeof window !== 'undefined') {
+    const paramRedirectTo =
+      searchParams.get("redirect_to") || "/dashboard/pricing";
+    if (typeof window !== "undefined") {
       setRedirectUrl(`${window.location.origin}${paramRedirectTo}`);
     }
 
@@ -39,7 +40,8 @@ export default function LoginPage() {
     }
   }, [user, isSessionLoading, router, searchParams]);
 
-  if (isAuthLoading || isSessionLoading || redirectUrl === null) { // Wait for redirectUrl to be set
+  if (isAuthLoading || isSessionLoading || redirectUrl === null) {
+    // Wait for redirectUrl to be set
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -51,7 +53,9 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-foreground">Welcome to DupeDelete</h2>
+        <h2 className="text-2xl font-bold text-center text-foreground">
+          Welcome to DupeDelete
+        </h2>
         <SupabaseAuth
           supabaseClient={supabase}
           providers={[]}
@@ -64,8 +68,8 @@ export default function LoginPage() {
                   brandAccent: "hsl(var(--primary-foreground))",
                 },
               },
-            }}
-          }
+            },
+          }}
           theme="dark"
           showLinks={true}
           redirectTo={redirectUrl} // Use the state variable here

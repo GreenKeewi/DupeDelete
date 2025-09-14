@@ -1,12 +1,22 @@
 "use client";
 
-import { Auth } from "@supabase/auth-ui-react";
+import NextDynamic from "next/dynamic";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/components/SessionContextProvider";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client"; // Import the shared Supabase client
+
+// Avoid SSR/prerender of the Auth UI by dynamically importing it on the client only
+const SupabaseAuth = NextDynamic(
+  () => import("@supabase/auth-ui-react").then((m) => m.Auth),
+  { ssr: false }
+);
+
+// Force this page to be dynamic so Next.js/Netlify doesn't try to prerender it at build time
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,7 +52,7 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-lg shadow-md">
         <h2 className="text-2xl font-bold text-center text-foreground">Welcome to DupeDelete</h2>
-        <Auth
+        <SupabaseAuth
           supabaseClient={supabase}
           providers={[]}
           appearance={{

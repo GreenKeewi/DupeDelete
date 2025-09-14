@@ -17,14 +17,11 @@ const nextConfig: NextConfig = {
       test: /\.wasm$/,
       type: "asset/resource",
       generator: {
-        filename: "static/[hash][ext]", // Output to static folder
+        // For server builds, place webp.wasm directly in the api/upload directory
+        // This is a specific workaround for jimp/image-hash's loading mechanism
+        filename: isServer ? "app/api/upload/[name][ext]" : "static/[hash][ext]",
       },
     });
-
-    // If you're building for the server, you might need to ensure
-    // that 'fs' and 'path' are not bundled by webpack, as they are Node.js built-ins.
-    // This is often handled by Next.js automatically, but can be a source of issues.
-    // For now, we'll rely on Next.js's default handling.
 
     return config;
   },

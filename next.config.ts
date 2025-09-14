@@ -24,13 +24,12 @@ const nextConfig: NextConfig = {
         new CopyWebpackPlugin({
           patterns: [
             {
-              // Updated path for webp.wasm, typically found in @jimp/plugin-webp
-              from: path.join(__dirname, 'node_modules/@jimp/plugin-webp/dist/webp.wasm'),
+              from: path.join(__dirname, 'node_modules/jimp/dist/webp.wasm'),
               to: path.join(config.output.path, 'app/api/upload/webp.wasm'),
             },
+            // Jimp might also need jimp-worker.wasm
             {
-              // Updated path for jimp-worker.wasm, typically found in @jimp/core
-              from: path.join(__dirname, 'node_modules/@jimp/core/dist/jimp-worker.wasm'),
+              from: path.join(__dirname, 'node_modules/jimp/dist/jimp-worker.wasm'),
               to: path.join(config.output.path, 'app/api/upload/jimp-worker.wasm'),
             },
           ],

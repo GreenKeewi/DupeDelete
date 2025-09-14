@@ -3,8 +3,17 @@
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function SuccessPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Force a refresh to ensure subscription data is re-fetched
+    router.refresh();
+  }, [router]);
+
   return (
     <main className="container mx-auto p-4 md:p-10 min-h-[calc(100vh-128px)] flex flex-col items-center justify-center text-center">
       <CheckCircle className="h-24 w-24 text-primary mb-6" />

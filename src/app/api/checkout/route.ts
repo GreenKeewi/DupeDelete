@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { plan, interval } = await req.json(); // Get interval from request body
+    const { plan, interval, userId } = await req.json(); // Get interval and userId from request body
 
     if (!plan || (plan !== "basic" && plan !== "pro")) {
       return new NextResponse("Invalid plan specified", { status: 400 });
@@ -19,17 +19,20 @@ export async function POST(req: Request) {
     if (!interval || (interval !== "monthly" && interval !== "yearly")) {
       return new NextResponse("Invalid interval specified", { status: 400 });
     }
+    if (!userId) {
+      return new NextResponse("User ID is required for checkout.", { status: 400 });
+    }
 
     let priceId: string | undefined;
 
     if (plan === "basic") {
       priceId = interval === "monthly"
         ? process.env.STRIPE_BASIC_PRICE_ID
-        : process.env.STRIPE_BASIC_YEARLY_PRICE_ID; // Use new yearly price ID
+        : process.env.STRIPE_BASIC_YEARLY_PRICE_ID;
     } else if (plan === "pro") {
       priceId = interval === "monthly"
         ? process.env.STRIPE_PRO_PRICE_ID
-        : process.env.STRIPE_PRO_YEARLY_PRICE_ID; // Use new yearly price ID
+        : process.env.STRIPE_PRO_YEARLY_PRICE_ID;
     }
 
     if (!priceId) {
@@ -48,6 +51,10 @@ export async function POST(req: Request) {
       ],
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
+      metadata: {
+        user_id: userId, // Pass the user ID to the Stripe session metadata
+      },
+      client_reference_id: userId, // Also useful for linking
     });
 
     return NextResponse.json({ url: session.url });

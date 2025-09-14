@@ -27,11 +27,7 @@ const nextConfig: NextConfig = {
               from: path.join(__dirname, 'node_modules/jimp/dist/webp.wasm'),
               to: path.join(config.output.path, 'app/api/upload/webp.wasm'),
             },
-            // Jimp might also need jimp-worker.wasm
-            {
-              from: path.join(__dirname, 'node_modules/jimp/dist/jimp-worker.wasm'),
-              to: path.join(config.output.path, 'app/api/upload/jimp-worker.wasm'),
-            },
+            // Removed jimp-worker.wasm copy pattern as it was causing an error
           ],
         })
       );

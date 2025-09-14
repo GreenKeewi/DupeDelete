@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import CopyWebpackPlugin from 'copy-webpack-plugin';
+import path from 'path';
 
 const nextConfig: NextConfig = {
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     // Existing rule for component tagger in development
     if (process.env.NODE_ENV === "development") {
       config.module.rules.push({
@@ -12,16 +14,28 @@ const nextConfig: NextConfig = {
       });
     }
 
-    // Add a rule to handle .wasm files
-    config.module.rules.push({
-      test: /\.wasm$/,
-      type: "asset/resource",
-      generator: {
-        // For server builds, place webp.wasm directly in the api/upload directory
-        // This is a specific workaround for jimp/image-hash's loading mechanism
-        filename: isServer ? "app/api/upload/[name][ext]" : "static/[hash][ext]",
-      },
-    });
+    // Remove the previous .wasm rule to avoid conflicts with CopyWebpackPlugin
+    config.module.rules = config.module.rules.filter(
+      (rule: any) => !(rule.test && rule.test.toString().includes('wasm'))
+    );
+
+    if (isServer) {
+      config.plugins.push(
+        new CopyWebpackPlugin({
+          patterns: [
+            {
+              from: path.join(__dirname, 'node_modules/jimp/dist/webp.wasm'),
+              to: path.join(config.output.path, 'app/api/upload/webp.wasm'),
+            },
+            // Jimp might also need jimp-worker.wasm
+            {
+              from: path.join(__dirname, 'node_modules/jimp/dist/jimp-worker.wasm'),
+              to: path.join(config.output.path, 'app/api/upload/jimp-worker.wasm'),
+            },
+          ],
+        })
+      );
+    }
 
     return config;
   },

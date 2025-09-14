@@ -1,66 +1,83 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client'; // Import the Supabase client
-import { useRouter } from 'next/navigation';
+import Link from "next/link";
+import { MoveRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/components/SessionContextProvider"; // Import useSession
 
-const Hero1 = () => {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export const Hero1 = () => {
   const router = useRouter();
+  const { user } = useSession(); // Get user from session
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    };
+  const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    e.preventDefault();
+    // If not on the home page, navigate to home and then scroll
+    if (window.location.pathname !== '/') {
+      router.push(`/#${sectionId}`);
+    } else {
+      const targetElement = document.getElementById(sectionId);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
 
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleUpgradeClick = () => {
-    // The Link component already handles navigation to /#pricing-section
-    // This function can be used for additional logic like analytics or
-    // setting a flag if needed, but for now, the navigation is primary.
-    console.log('Upgrade button clicked. User logged in:', !!user);
-    // The pricing section will handle the subsequent login/payment flow.
+  const handleUpgradeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!user) {
+      e.preventDefault(); // Prevent default link navigation
+      // Store the intended plan (Pro, monthly by default for "unlimited cleaning")
+      localStorage.setItem('pendingCheckoutPlan', 'pro');
+      localStorage.setItem('pendingCheckoutInterval', 'monthly');
+      router.push(`/login?redirect_to=${encodeURIComponent('/dashboard/pricing')}`);
+    }
+    // If user is logged in, let the Link component handle navigation to #pricing-section
   };
 
   return (
-    <section className="relative w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container px-4 md:px-6 text-center">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none text-gray-900 dark:text-gray-50">
-              Unlock Your Potential with Our Premium Plans
+    <div className="w-full">
+      <div className="container mx-auto px-4">
+        <div className="flex gap-8 py-20 lg:py-40 items-center justify-center flex-col">
+          <div>
+            <Link href="#how-it-works" onClick={(e) => handleScrollToSection(e, 'how-it-works')}>
+              <Button variant="secondary" size="sm" className="gap-4">
+                Learn how DupeDelete works <MoveRight className="w-4 h-4" />
+              </Button>
+            </Link>
+          </div>
+          <div className="flex gap-4 flex-col">
+            <h1 className="text-5xl md:text-7xl max-w-2xl tracking-tighter text-center font-regular">
+              Clean Your Folders in Seconds
             </h1>
-            <p className="mx-auto max-w-[700px] text-gray-600 md:text-xl dark:text-gray-400">
-              Choose the perfect plan to fit your needs and elevate your experience.
+            <p className="text-lg md:text-xl leading-relaxed tracking-tight text-muted-foreground max-w-2xl text-center">
+              Stop wasting storage on duplicate images. DupeDelete scans your folder, shows duplicate images in a checklist, and lets you keep what you want — all in just a few clicks.
             </p>
           </div>
-          <div className="space-x-4">
-            <Link href="/#pricing-section" onClick={handleUpgradeClick} className="w-full sm:w-auto">
-              <Button
-                size="lg"
-                className="gap-4 w-full sm:px-4 sm:py-2 sm:text-sm bg-blue-600 hover:bg-blue-700 text-white"
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Link href="/cleanup" className="w-full sm:w-auto">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="gap-4 w-full 
+                           sm:px-4 sm:py-2 sm:text-sm 
+                           md:px-6 md:py-3 md:text-base"
               >
-                {user ? "Upgrade Your Plan" : "Get Started"}
+                Clean up to 100 images free
+              </Button>
+            </Link>
+            <Link href="/#pricing-section" onClick={handleUpgradeClick} className="w-full sm:w-auto">
+              <Button 
+                size="lg" 
+                className="gap-4 w-full 
+                           sm:px-4 sm:py-2 sm:text-sm 
+                           md:px-6 md:py-3 md:text-base"
+              >
+                Upgrade for unlimited cleaning <MoveRight className="w-4 h-4" />
               </Button>
             </Link>
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 };
-
-export default Hero1;

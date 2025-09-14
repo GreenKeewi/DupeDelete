@@ -1,31 +1,78 @@
-import React from 'react';
-import { redirect } from 'next/navigation';
-import { supabase } from '@/integrations/supabase/client';
+"use client";
 
-export default async function DashboardPage() {
-  const { data: { user } } = await supabase.auth.getUser();
+import { FeedbackBanner } from "@/components/dashboard/FeedbackBanner";
+import { DropzoneCard } from "@/components/dashboard/DropzoneCard";
+import { AccountPreviewCard } from "@/components/dashboard/AccountPreviewCard";
+import { useSession } from "@/components/SessionContextProvider";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react"; // Import useState
+import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client"; // Import supabase
 
-  if (!user) {
-    redirect('/login'); // Redirect unauthenticated users to login
+export default function DashboardOverviewPage() {
+  const { user, isLoading: isSessionLoading } = useSession();
+  const router = useRouter();
+  const [firstName, setFirstName] = useState<string | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isSessionLoading && !user) {
+      router.push("/login?redirect_to=/dashboard");
+    }
+  }, [user, isSessionLoading, router]);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        setIsProfileLoading(true);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('first_name')
+          .eq('id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+          console.error("Error fetching profile:", error);
+          setFirstName(null);
+        } else if (data) {
+          setFirstName(data.first_name);
+        } else {
+          setFirstName(null); // No profile found
+        }
+        setIsProfileLoading(false);
+      } else {
+        setFirstName(null);
+        setIsProfileLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user]); // Re-fetch when user object changes
+
+  const isLoading = isSessionLoading || isProfileLoading;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-128px)]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading dashboard...</p>
+      </div>
+    );
   }
 
+  if (!user) {
+    return null;
+  }
+
+  const welcomeName = firstName || user.email?.split('@')[0] || 'user';
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
-      <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-50 mb-4">Welcome to Your Dashboard!</h1>
-      <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
-        You are logged in as {user.email}. Your plan details will appear here.
-      </p>
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-50 mb-4">Your Current Plan</h2>
-        <p className="text-gray-700 dark:text-gray-300">
-          This is where your active subscription plan details will be displayed after a successful payment.
-        </p>
-        {/* Placeholder for plan details */}
-        <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
-          <p className="font-medium text-gray-800 dark:text-gray-200">Plan: Basic (Placeholder)</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Status: Active (Placeholder)</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Next Billing: YYYY-MM-DD (Placeholder)</p>
-        </div>
+    <div className="space-y-8">
+      <h1 className="text-4xl font-bold text-foreground mb-6">Welcome back, {welcomeName}!</h1> {/* Added welcome message */}
+      <FeedbackBanner />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <DropzoneCard />
+        <AccountPreviewCard />
       </div>
     </div>
   );

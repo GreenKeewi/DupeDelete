@@ -22,8 +22,8 @@ async function getRawBody(readable: ReadableStream<Uint8Array>): Promise<Buffer>
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // Changed API version to a stable, recent one to ensure type compatibility
-  apiVersion: "2024-06-20", 
+  // Changed API version to match the expected type "2025-08-27.basil"
+  apiVersion: "2025-08-27.basil", 
 });
 
 export async function POST(req: Request) {
@@ -68,7 +68,8 @@ export async function POST(req: Request) {
       // Fetch subscription details from Stripe
       const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const priceId = stripeSubscription.items.data[0].price.id;
-      const currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000).toISOString();
+      // Asserting type for current_period_end to resolve TypeScript error
+      const currentPeriodEnd = new Date((stripeSubscription.current_period_end as number) * 1000).toISOString();
 
       // Determine plan_id based on Stripe Price ID
       let plan_id: string;

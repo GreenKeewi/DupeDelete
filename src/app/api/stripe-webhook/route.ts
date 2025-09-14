@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from '@supabase/supabase-js'; // Import createClient for server-side
 
 // Stripe needs the raw body for signature verification, so we disable Next.js's body parser.
 export const config = {
@@ -42,7 +42,6 @@ export async function POST(req: Request) {
   let rawBody: Buffer;
 
   try {
-    // Get the raw body from the request stream
     rawBody = await getRawBody(req.body as ReadableStream<Uint8Array>);
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
@@ -50,66 +49,74 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
+  // Initialize Supabase client with the Service Role Key for server-side operations
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!, // Use NEXT_PUBLIC_SUPABASE_URL for the URL
+    process.env.SUPABASE_SERVICE_ROLE_KEY! // Use the Service Role Key here
+  );
+
   // Handle the event
   switch (event.type) {
     case 'checkout.session.completed':
       const session = event.data.object as Stripe.Checkout.Session;
-      console.log("Stripe Checkout Session Completed:", session.id);
+      console.log("[Stripe Webhook] Checkout Session Completed:", session.id);
 
       const customerId = session.customer as string;
       const subscriptionId = session.subscription as string;
-      const userId = session.metadata?.user_id; // Retrieve user_id from metadata
+      const userId = session.metadata?.user_id;
 
       if (!userId) {
-        console.error("User ID not found in checkout session metadata.");
+        console.error("[Stripe Webhook] User ID not found in checkout session metadata for session:", session.id);
         return new NextResponse("User ID missing in metadata.", { status: 400 });
       }
 
-      // Fetch subscription details from Stripe
-      const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const priceId = stripeSubscription.items.data[0].price.id;
-      // Asserting type for current_period_end to resolve TypeScript error
-      const currentPeriodEnd = new Date(((stripeSubscription as any).current_period_end as number) * 1000).toISOString();
+      try {
+        const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const priceId = stripeSubscription.items.data[0].price.id;
+        // Asserting type for current_period_end to resolve TypeScript error
+        const currentPeriodEnd = new Date(((stripeSubscription as any).current_period_end as number) * 1000).toISOString();
 
-      // Determine plan_id based on Stripe Price ID
-      let plan_id: string;
-      if (priceId === process.env.STRIPE_BASIC_PRICE_ID) {
-        plan_id = 'basic_monthly';
-      } else if (priceId === process.env.STRIPE_BASIC_YEARLY_PRICE_ID) {
-        plan_id = 'basic_yearly';
-      } else if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
-        plan_id = 'pro_monthly';
-      } else if (priceId === process.env.STRIPE_PRO_YEARLY_PRICE_ID) {
-        plan_id = 'pro_yearly';
-      } else {
-        console.warn(`Unknown Stripe Price ID: ${priceId}. Defaulting to 'free'.`);
-        plan_id = 'free';
+        let plan_id: string;
+        if (priceId === process.env.STRIPE_BASIC_PRICE_ID) {
+          plan_id = 'basic_monthly';
+        } else if (priceId === process.env.STRIPE_BASIC_YEARLY_PRICE_ID) {
+          plan_id = 'basic_yearly';
+        } else if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
+          plan_id = 'pro_monthly';
+        } else if (priceId === process.env.STRIPE_PRO_YEARLY_PRICE_ID) {
+          plan_id = 'pro_yearly';
+        } else {
+          console.warn(`[Stripe Webhook] Unknown Stripe Price ID: ${priceId}. Defaulting to 'free'.`);
+          plan_id = 'free';
+        }
+
+        const subscriptionData = {
+          user_id: userId,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          status: stripeSubscription.status,
+          plan_id: plan_id,
+          current_period_end: currentPeriodEnd,
+        };
+
+        console.log("[Stripe Webhook] Attempting to upsert subscription data:", subscriptionData);
+
+        const { error: upsertError } = await supabaseAdmin
+          .from('subscriptions')
+          .upsert(subscriptionData, { onConflict: 'user_id' });
+
+        if (upsertError) {
+          console.error("[Stripe Webhook] Error upserting subscription:", JSON.stringify(upsertError, null, 2));
+          return new NextResponse(`Database Error: ${upsertError.message}`, { status: 500 });
+        }
+        console.log(`[Stripe Webhook] Subscription for user ${userId} successfully updated to ${plan_id} (${stripeSubscription.status}).`);
+      } catch (retrieveError: any) {
+        console.error("[Stripe Webhook] Error retrieving Stripe subscription details:", retrieveError);
+        return new NextResponse(`Stripe API Error: ${retrieveError.message}`, { status: 500 });
       }
-
-      // Upsert (insert or update) the subscription in Supabase
-      const { error: upsertError } = await supabase
-        .from('subscriptions')
-        .upsert(
-          {
-            user_id: userId,
-            stripe_customer_id: customerId,
-            stripe_subscription_id: subscriptionId,
-            status: stripeSubscription.status,
-            plan_id: plan_id,
-            current_period_end: currentPeriodEnd,
-          },
-          { onConflict: 'user_id' } // Conflict on user_id to update existing subscription
-        );
-
-      if (upsertError) {
-        console.error("Error upserting subscription:", upsertError);
-        return new NextResponse(`Database Error: ${upsertError.message}`, { status: 500 });
-      }
-      console.log(`Subscription for user ${userId} updated to ${plan_id} (${stripeSubscription.status}).`);
       break;
-    // Add other event types as needed (e.g., 'customer.subscription.updated', 'invoice.payment_failed')
     default:
-      console.log(`Unhandled event type ${event.type}`);
+      console.log(`[Stripe Webhook] Unhandled event type ${event.type}`);
   }
 
   return new NextResponse("OK", { status: 200 });

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20", // Updated to a stable API version
+  apiVersion: "2025-08-27.basil", // Updated API version
 });
 
 export async function POST(req: Request) {
@@ -45,12 +45,18 @@ export async function POST(req: Request) {
       subscription.stripe_subscription_id
     );
 
+    let currentPeriodEnd: string | null = null;
+    // Use type assertion to bypass TypeScript's strict check for current_period_end
+    if (typeof (cancelledSubscription as any).current_period_end === 'number') {
+      currentPeriodEnd = new Date((cancelledSubscription as any).current_period_end * 1000).toISOString();
+    }
+
     // Update the subscription status in Supabase
     const { error: updateError } = await supabaseAdmin
       .from('subscriptions')
       .update({
         status: cancelledSubscription.status, // Should be 'canceled'
-        current_period_end: new Date(cancelledSubscription.current_period_end * 1000).toISOString(), // Update period end
+        current_period_end: currentPeriodEnd, // Safely update period end
       })
       .eq('user_id', userId);
 

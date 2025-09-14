@@ -1,9 +1,8 @@
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
-import imageHash from 'image-hash';
 import { v4 as uuidv4 } from 'uuid';
-import { Jimp } from 'jimp'; // Changed to named import as per TypeScript suggestion
+import { Jimp } from 'jimp'; // Corrected to named import
 import { ssim } from 'ssim.js'; // Import ssim.js for SSIM comparison
 
 export type FileType = 'image' | 'other';
@@ -28,7 +27,7 @@ export interface DuplicateGroup {
 }
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
-const SIMILARITY_THRESHOLD = 5; // Hamming distance threshold for image similarity (pHash)
+const SIMILARITY_THRESHOLD = 5; // Hamming distance threshold for image similarity (dHash)
 const SSIM_THRESHOLD = 0.90; // SSIM similarity threshold
 
 function isImageFile(filePath: string): boolean {
@@ -46,22 +45,42 @@ async function getSha256Hash(filePath: string): Promise<string> {
   return createHash('sha256').update(fileBuffer).digest('hex');
 }
 
-async function getPerceptualHash(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    imageHash({
-      path: filePath,
-      mode: 'blockhash', // Using blockhash for perceptual hashing
-      bits: 16 // Generates a 64-bit hash (16 hex characters)
-    }, (error: Error | null, data: string) => {
-      if (error) {
-        console.error(`Error generating perceptual hash for ${filePath}:`, error);
-        // Fallback to SHA256 if perceptual hashing fails, though this should ideally not happen for images
-        getSha256Hash(filePath).then(resolve).catch(reject);
-      } else {
-        resolve(data);
+/**
+ * Generates a Difference Hash (dHash) for an image.
+ * Resizes the image to 9x8, converts to grayscale, and compares adjacent pixels.
+ * Returns a 64-bit hash as a 16-character hexadecimal string.
+ */
+async function getDifferenceHash(filePath: string): Promise<string> {
+  try {
+    const image = await Jimp.read(filePath);
+    // Resize to 9x8 for 8x8 comparisons and convert to greyscale
+    const resizedImage = image.resize(9, 8).greyscale(); // Corrected 'grayscale' to 'greyscale'
+
+    let hashBinary = '';
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 8; x++) {
+        const pixelLeft = resizedImage.getPixelColor(x, y);
+        const pixelRight = resizedImage.getPixelColor(x + 1, y);
+
+        // Extract average intensity (since it's greyscale, R, G, B are same)
+        const avgLeft = (pixelLeft >> 24) & 0xFF; // Red component (or any channel for greyscale)
+        const avgRight = (pixelRight >> 24) & 0xFF;
+
+        hashBinary += (avgLeft > avgRight) ? '1' : '0';
       }
-    });
-  });
+    }
+    // Convert 64-bit binary string to 16-character hex string
+    return parseInt(hashBinary, 2).toString(16).padStart(16, '0');
+  } catch (error) {
+    console.error(`Error generating difference hash for ${filePath}:`, error);
+    // Fallback to SHA256 if perceptual hashing fails
+    return getSha256Hash(filePath);
+  }
+}
+
+async function getPerceptualHash(filePath: string): Promise<string> {
+  // Now using dHash instead of pHash from image-hash library
+  return getDifferenceHash(filePath);
 }
 
 // Helper to convert a hex character to a 4-bit binary string
@@ -91,16 +110,14 @@ function getHammingDistance(hash1: string, hash2: string): number {
 
 async function getSsimSimilarity(imagePath1: string, imagePath2: string): Promise<number> {
   try {
-    // Use type assertion to bypass TypeScript's check on 'read'
-    const img1 = await (Jimp as any).read(imagePath1);
-    const img2 = await (Jimp as any).read(imagePath2);
+    const img1 = await Jimp.read(imagePath1);
+    const img2 = await Jimp.read(imagePath2);
 
     // Resize images to a common smaller dimension for faster SSIM calculation
     // and to handle slight resolution differences.
     const commonSize = 256; // e.g., 256x256
-    // Use type assertion to bypass TypeScript's check on 'constants'
-    img1.resize({ w: commonSize, h: commonSize, mode: (Jimp as any).constants.RESIZE_BICUBIC });
-    img2.resize({ w: commonSize, h: commonSize, mode: (Jimp as any).constants.RESIZE_BICUBIC });
+    img1.resize(commonSize, commonSize); // Removed Jimp.RESIZE_BICUBIC
+    img2.resize(commonSize, commonSize); // Removed Jimp.RESIZE_BICUBIC
 
     // Convert to raw pixel data for ssim.js
     // ssim.js expects Uint8ClampedArray for ImageData.data

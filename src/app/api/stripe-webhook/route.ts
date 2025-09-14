@@ -22,11 +22,12 @@ async function getRawBody(readable: ReadableStream<Uint8Array>): Promise<Buffer>
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // Changed API version to match the expected type "2025-08-27.basil"
   apiVersion: "2025-08-27.basil", 
 });
 
 export async function POST(req: Request) {
+  console.log("[Stripe Webhook] Received a request."); // <-- New log here
+
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error("STRIPE_WEBHOOK_SECRET is not set.");
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
 
   const sig = req.headers.get("stripe-signature");
   if (!sig) {
+    console.error("[Stripe Webhook] No Stripe signature header."); // Added log
     return new NextResponse("No Stripe signature header.", { status: 400 });
   }
 
@@ -44,15 +46,16 @@ export async function POST(req: Request) {
   try {
     rawBody = await getRawBody(req.body as ReadableStream<Uint8Array>);
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    console.log(`[Stripe Webhook] Event constructed: ${event.type}`); // Added log
   } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`);
+    console.error(`[Stripe Webhook] Webhook signature verification failed: ${err.message}`); // Added log
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
   // Initialize Supabase client with the Service Role Key for server-side operations
   const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!, // Use NEXT_PUBLIC_SUPABASE_URL for the URL
-    process.env.SUPABASE_SERVICE_ROLE_KEY! // Use the Service Role Key here
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   // Handle the event
@@ -71,10 +74,10 @@ export async function POST(req: Request) {
       }
 
       try {
-        const stripeSubscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        // Cast to any to bypass strict TypeScript checking for this specific object
+        const stripeSubscription: any = await stripe.subscriptions.retrieve(subscriptionId);
         const priceId = stripeSubscription.items.data[0].price.id;
-        // Asserting type for current_period_end to resolve TypeScript error
-        const currentPeriodEnd = new Date(((stripeSubscription as any).current_period_end as number) * 1000).toISOString();
+        const currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000).toISOString();
 
         let plan_id: string;
         if (priceId === process.env.STRIPE_BASIC_PRICE_ID) {
@@ -111,7 +114,7 @@ export async function POST(req: Request) {
         }
         console.log(`[Stripe Webhook] Subscription for user ${userId} successfully updated to ${plan_id} (${stripeSubscription.status}).`);
       } catch (retrieveError: any) {
-        console.error("[Stripe Webhook] Error retrieving Stripe subscription details:", retrieveError);
+        console.error("[Stripe Webhook] Error retrieving Stripe subscription details or processing data:", retrieveError); // Updated log
         return new NextResponse(`Stripe API Error: ${retrieveError.message}`, { status: 500 });
       }
       break;

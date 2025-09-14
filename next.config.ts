@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
-import CopyWebpackPlugin from 'copy-webpack-plugin';
-import path from 'path';
 
 const nextConfig: NextConfig = {
-  webpack: (config, { isServer, webpack }) => {
+  webpack: (config, { isServer }) => {
     // Existing rule for component tagger in development
     if (process.env.NODE_ENV === "development") {
       config.module.rules.push({
@@ -14,24 +12,20 @@ const nextConfig: NextConfig = {
       });
     }
 
-    // Remove the previous .wasm rule to avoid conflicts with CopyWebpackPlugin
+    // Remove any previous .wasm rules or copy-webpack-plugin configurations
     config.module.rules = config.module.rules.filter(
       (rule: any) => !(rule.test && rule.test.toString().includes('wasm'))
     );
+    // Also remove CopyWebpackPlugin if it was added
+    config.plugins = config.plugins.filter(
+      (plugin: any) => plugin.constructor.name !== 'CopyWebpackPlugin'
+    );
 
-    if (isServer) {
-      config.plugins.push(
-        new CopyWebpackPlugin({
-          patterns: [
-            {
-              from: path.join(__dirname, 'node_modules/jimp/dist/webp.wasm'),
-              to: path.join(config.output.path, 'app/api/upload/webp.wasm'),
-            },
-            // Removed jimp-worker.wasm copy pattern as it was causing an error
-          ],
-        })
-      );
-    }
+    // Add a standard rule to handle .wasm files as assets
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: "asset/resource",
+    });
 
     return config;
   },

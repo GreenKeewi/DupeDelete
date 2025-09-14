@@ -7,7 +7,6 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SessionContextProvider } from "@/components/SessionContextProvider";
 import { usePathname } from "next/navigation"; // Import usePathname
-import { Toaster } from "sonner"; // Import Toaster for global notifications
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,7 +43,6 @@ export default function RootLayout({
             {children}
           </div>
           {!isDashboardRoute && <Footer />} {/* Render global Footer only if not on dashboard route */}
-          <Toaster richColors position="top-right" /> {/* Add Toaster here */}
         </SessionContextProvider>
       </body>
     </html>

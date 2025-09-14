@@ -2,18 +2,15 @@
 
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/types/supabase";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/components/SessionContextProvider";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client"; // Import the shared Supabase client
 
 export default function LoginPage() {
-  const supabase = createClientComponentClient<Database>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Set default redirect to /dashboard/pricing if no specific redirect_to is provided
   const redirectTo = searchParams.get("redirect_to") || "/dashboard/pricing"; 
   const { user, isLoading: isSessionLoading } = useSession();
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -51,8 +48,8 @@ export default function LoginPage() {
                   brandAccent: "hsl(var(--primary-foreground))",
                 },
               },
-            },
-          }}
+            }}
+          }
           theme="dark"
           showLinks={true}
           redirectTo={`${window.location.origin}${redirectTo}`}

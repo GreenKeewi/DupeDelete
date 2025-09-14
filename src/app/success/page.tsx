@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,8 +12,8 @@ export default function SuccessPage() {
       <p className="text-lg text-muted-foreground mb-8 max-w-md">
         Thank you for your purchase. Your plan has been activated, and you can now enjoy unlimited cleaning.
       </p>
-      <Link href="/cleanup">
-        <Button size="lg">Start Cleaning Now</Button>
+      <Link href="/dashboard">
+        <Button size="lg">Go to Dashboard</Button>
       </Link>
     </main>
   );

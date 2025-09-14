@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { User } from "@supabase/supabase-js";
+import { fetchJson } from "@/lib/api-utils"; // Import fetchJson
 
 interface UseCheckoutOptions {
   user: User | null;
@@ -29,7 +30,7 @@ export const useCheckout = ({ user, onLoadingChange }: UseCheckoutOptions) => {
     toast.loading(`Initiating ${plan} ${interval} plan checkout...`, { id: "checkout" });
 
     try {
-      const response = await fetch("/api/checkout", {
+      const { url } = await fetchJson<{ url: string }>("/api/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -37,11 +38,6 @@ export const useCheckout = ({ user, onLoadingChange }: UseCheckoutOptions) => {
         body: JSON.stringify({ plan, interval, userId: user.id }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to create checkout session.");
-      }
-
-      const { url } = await response.json();
       if (url) {
         router.push(url);
       } else {
@@ -49,7 +45,7 @@ export const useCheckout = ({ user, onLoadingChange }: UseCheckoutOptions) => {
       }
     } catch (error) {
       console.error("Stripe checkout error:", error);
-      toast.error("Failed to start checkout. Please try again.", { id: "checkout" });
+      toast.error((error as Error).message || "Failed to start checkout. Please try again.", { id: "checkout" });
       setIsCheckoutLoading(false);
       onLoadingChange?.(false);
     }

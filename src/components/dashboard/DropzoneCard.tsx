@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UploadCloud, Loader2 } from "lucide-react";
 import JSZip from "jszip";
+import { fetchJson } from "@/lib/api-utils"; // Import fetchJson
 
 export const DropzoneCard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -45,22 +46,12 @@ export const DropzoneCard = () => {
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
-      const response = await fetch("/api/upload", {
+      const responseData = await fetchJson<{ jobId: string; duplicateGroups: any[]; allScannedFiles: any[]; }>("/api/upload", {
         method: "POST",
         body: formData,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (response.status === 403 && errorData.redirect) {
-          toast.warning(errorData.message, { id: "upload-scan" });
-          router.push(errorData.redirect);
-          return;
-        }
-        throw new Error(errorData.message || "Failed to upload and scan files.");
-      }
-
-      const { jobId, duplicateGroups, allScannedFiles } = await response.json();
+      const { jobId, duplicateGroups, allScannedFiles } = responseData;
       
       // Store this data in local storage or a global state if needed for /cleanup
       // For now, we'll just redirect. The /cleanup page will need to fetch this data
@@ -74,7 +65,13 @@ export const DropzoneCard = () => {
       router.push("/dashboard/cleanup"); // Redirect to the cleanup page within the dashboard
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
+      // Check if the error message indicates a redirect for pricing
+      if (error.message.includes("File limit exceeded") && error.message.includes("upgrade")) {
+        toast.warning(error.message, { id: "upload-scan" });
+        router.push("/pricing"); // Redirect to pricing page
+      } else {
+        toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
+      }
     } finally {
       setIsProcessing(false);
     }

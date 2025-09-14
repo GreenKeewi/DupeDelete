@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Mail, CreditCard, CalendarDays, Trash2 } from "lucide-react"; // Import Trash2
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { fetchJson } from "@/lib/api-utils"; // Import fetchJson
 
 // Form imports
 import { useForm } from "react-hook-form";
@@ -142,18 +143,13 @@ export default function AccountPage() {
     toast.loading("Cancelling your subscription...", { id: "cancel-sub" });
 
     try {
-      const response = await fetch("/api/cancel-subscription", {
+      await fetchJson<{ message: string }>("/api/cancel-subscription", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ userId: user.id }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to cancel subscription.");
-      }
 
       toast.success("Subscription cancelled successfully!", { id: "cancel-sub" });
       router.refresh(); // Refresh to update subscription status

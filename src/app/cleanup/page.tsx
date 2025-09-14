@@ -10,6 +10,7 @@ import { Trash2, Download, Image as ImageIcon, Eye } from "lucide-react";
 import { DuplicateComparisonDialog } from "@/components/DuplicateComparisonDialog";
 import { ScannedFile } from "@/lib/duplicate-detection";
 import JSZip from "jszip";
+import { fetchJson } from "@/lib/api-utils"; // Import fetchJson
 
 interface FrontendDuplicateFile {
   id: string;
@@ -82,22 +83,12 @@ export default function CleanupPageContent() { // Renamed to CleanupPageContent
     formData.append('file', zippedBlob, 'uploaded_folder.zip');
 
     try {
-      const response = await fetch("/api/upload", {
+      const responseData = await fetchJson<{ jobId: string; duplicateGroups: FrontendDuplicateFile[]; allScannedFiles: ScannedFile[]; }>("/api/upload", {
         method: "POST",
         body: formData,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (response.status === 403 && errorData.redirect) {
-          toast.warning(errorData.message, { id: "upload-scan" });
-          router.push("/dashboard/pricing"); // Redirect to dashboard pricing
-          return;
-        }
-        throw new Error(errorData.message || "Failed to upload and scan files.");
-      }
-
-      const { jobId, duplicateGroups, allScannedFiles } = await response.json();
+      const { jobId, duplicateGroups, allScannedFiles } = responseData;
       setJobId(jobId);
 
       const filesWithPreviews: ScannedFile[] = allScannedFiles.map((file: ScannedFile) => {
@@ -122,7 +113,13 @@ export default function CleanupPageContent() { // Renamed to CleanupPageContent
       toast.success("Scan complete! Review duplicate images below.", { id: "upload-scan" });
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
+      // Check if the error message indicates a redirect for pricing
+      if (error.message.includes("File limit exceeded") && error.message.includes("upgrade")) {
+        toast.warning(error.message, { id: "upload-scan" });
+        router.push("/dashboard/pricing"); // Redirect to pricing page
+      } else {
+        toast.error(error.message || "Failed to upload and scan files.", { id: "upload-scan" });
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -180,7 +177,10 @@ export default function CleanupPageContent() { // Renamed to CleanupPageContent
       });
 
       if (!response.ok) {
-        throw new Error("Failed to download cleaned folder.");
+        const errorText = await response.text(); // Get raw text for debugging
+        console.error("Download API error response:", errorText);
+        toast.error("Failed to download cleaned folder. Check console for details.", { id: "download-zip" });
+        return;
       }
 
       const blob = await response.blob();

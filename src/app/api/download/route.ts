@@ -6,7 +6,7 @@ import { getTempFilePath, cleanupTempDir } from '@/lib/file-utils';
 
 export async function POST(req: Request) {
   if (req.method !== "POST") {
-    return new NextResponse("Method Not Allowed", { status: 405 });
+    return NextResponse.json({ message: "Method Not Allowed" }, { status: 405 });
   }
 
   let extractedDirPath: string | undefined;
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     console.log("Files to keep for download:", filesToKeep);
 
     if (!jobId || !Array.isArray(filesToKeep)) {
-      return new NextResponse("Invalid request body: jobId and filesToKeep are required.", { status: 400 });
+      return NextResponse.json({ message: "Invalid request body: jobId and filesToKeep are required." }, { status: 400 });
     }
 
     extractedDirPath = path.join(process.env.TEMP_BASE_DIR || path.join(require('os').tmpdir(), 'dupe-delete-temp'), jobId + '-extracted-');
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("Error in /api/download:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
   } finally {
     if (extractedDirPath) {
       // Clean up the temporary directory after download

@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   const relativePath = searchParams.get('relativePath');
 
   if (!jobId || !relativePath) {
-    return new NextResponse('Missing jobId or relativePath', { status: 400 });
+    return NextResponse.json({ message: 'Missing jobId or relativePath' }, { status: 400 });
   }
 
   try {
@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error(`Error serving preview for ${jobId}/${relativePath}:`, error);
-    return new NextResponse('File not found or inaccessible', { status: 404 });
+    return NextResponse.json({ message: 'File not found or inaccessible' }, { status: 404 });
   }
 }
 

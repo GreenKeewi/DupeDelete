@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { cleanupTempDir } from "@/lib/file-utils";
+import { promises as fs } from "fs";
 import JSZip from "jszip";
-import { promises as fs } from 'fs';
-import path from 'path';
-import { getTempFilePath, cleanupTempDir } from '@/lib/file-utils';
+import { NextResponse } from "next/server";
+import path from "path";
 
 export async function POST(req: Request) {
   if (req.method !== "POST") {
@@ -16,13 +16,20 @@ export async function POST(req: Request) {
     console.log("Files to keep for download:", filesToKeep);
 
     if (!jobId || !Array.isArray(filesToKeep)) {
-      return new NextResponse("Invalid request body: jobId and filesToKeep are required.", { status: 400 });
+      return new NextResponse(
+        "Invalid request body: jobId and filesToKeep are required.",
+        { status: 400 }
+      );
     }
 
-    extractedDirPath = path.join(process.env.TEMP_BASE_DIR || path.join(require('os').tmpdir(), 'dupe-delete-temp'), jobId + '-extracted-');
+    extractedDirPath = path.join(
+      process.env.TEMP_BASE_DIR ||
+        path.join(require("os").tmpdir(), "dupe-delete-temp"),
+      jobId + "-extracted-"
+    );
 
     const zip = new JSZip();
-    
+
     for (const relativePath of filesToKeep) {
       const fullPath = path.join(extractedDirPath, relativePath);
       try {
@@ -36,7 +43,7 @@ export async function POST(req: Request) {
 
     const zipBlob = await zip.generateAsync({ type: "nodebuffer" });
 
-    return new NextResponse(zipBlob, {
+    return new NextResponse(new Uint8Array(zipBlob), {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
@@ -49,7 +56,9 @@ export async function POST(req: Request) {
   } finally {
     if (extractedDirPath) {
       // Clean up the temporary directory after download
-      await cleanupTempDir(extractedDirPath).catch(err => console.error("Failed to clean up after download:", err));
+      await cleanupTempDir(extractedDirPath).catch((err) =>
+        console.error("Failed to clean up after download:", err)
+      );
     }
   }
 }

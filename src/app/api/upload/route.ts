@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
-import { promises as fsp } from 'fs';
-import * as fs from 'fs';
-import path from 'path';
-import unzipper from 'unzipper';
-import { createTempDir, cleanupTempDir, getFilesInDir } from '@/lib/file-utils';
-import { scanFilesForDuplicates, DuplicateGroup as BackendDuplicateGroup, ScannedFile } from '@/lib/duplicate-detection';
+import { scanFilesForDuplicates, ScannedFile } from "@/lib/duplicate-detection";
+import { cleanupTempDir, createTempDir, getFilesInDir } from "@/lib/file-utils";
+import * as fs from "fs";
+import { promises as fsp } from "fs";
+import { NextResponse } from "next/server";
+import path from "path";
+import unzipper from "unzipper";
 
 // Declare module for unzipper is now in src/types/unzipper.d.ts
 
@@ -27,33 +27,78 @@ interface FrontendDuplicateFile {
 }
 
 export async function POST(req: Request) {
-  if (req.method !== 'POST') {
-    return new NextResponse('Method Not Allowed', { status: 405 });
+  if (req.method !== "POST") {
+    return new NextResponse(JSON.stringify({ message: "Method Not Allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   let tempZipPath: string | undefined;
   let extractedDirPath: string | undefined;
+  let jobId: string | undefined;
 
   try {
     const formData = await req.formData();
-    const file = formData.get('file') as File | null;
+    const file = formData.get("file") as File | null;
+    // Optional tuning parameters sent by client
+    const mode = formData.get("mode") as string | null as
+      | "strict"
+      | "balanced"
+      | "loose"
+      | null;
+    const pHashThreshold = formData.get("pHashThreshold")
+      ? Number(formData.get("pHashThreshold"))
+      : undefined;
+    const ssimThreshold = formData.get("ssimThreshold")
+      ? Number(formData.get("ssimThreshold"))
+      : undefined;
 
     if (!file) {
-      return new NextResponse('No file uploaded.', { status: 400 });
+      return new NextResponse(
+        JSON.stringify({ message: "No file uploaded." }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return new NextResponse(`File size exceeds the limit of ${MAX_FILE_SIZE / (1024 * 1024)}MB.`, { status: 413 });
+      return new NextResponse(
+        JSON.stringify({
+          message: `File size exceeds the limit of ${
+            MAX_FILE_SIZE / (1024 * 1024)
+          }MB.`,
+        }),
+        { status: 413, headers: { "Content-Type": "application/json" } }
+      );
     }
 
-    if (file.type !== 'application/zip' && file.type !== 'application/x-zip-compressed') {
-      return new NextResponse('Only ZIP files are allowed.', { status: 400 });
+    const isZipByType =
+      file.type === "application/zip" ||
+      file.type === "application/x-zip-compressed" ||
+      file.type === "application/octet-stream" ||
+      file.type === "";
+    const isZipByName = (file as any).name?.toLowerCase?.().endsWith(".zip");
+    if (!isZipByType && !isZipByName) {
+      return new NextResponse(
+        JSON.stringify({ message: "Only ZIP files are allowed." }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     // Create a temporary directory for this job
-    const jobId = path.basename(await createTempDir()); // Use the generated UUID as jobId
-    extractedDirPath = path.join(await createTempDir(jobId + '-extracted-')); // Create a dedicated extracted dir for this job
-    console.log(`[Upload API] Job ID: ${jobId}, Extracted Dir: ${extractedDirPath}`); // Added logging
+    // Create a stable jobId and extracted dir under OS temp base
+    const baseTemp = await createTempDir("job-");
+    jobId = path.basename(baseTemp);
+    // We want a sibling dir with suffix -extracted-
+    extractedDirPath = path.join(path.dirname(baseTemp), jobId + "-extracted-");
+    await fsp.mkdir(extractedDirPath, { recursive: true });
+    // Remove the unused baseTemp dir to avoid leaks
+    try {
+      await fsp.rm(baseTemp, { recursive: true, force: true });
+    } catch {}
+    console.log(
+      `[Upload API] Job ID: ${jobId}, Extracted Dir: ${extractedDirPath}`
+    ); // Added logging
 
     // Save the uploaded zip file temporarily
     tempZipPath = path.join(extractedDirPath, file.name); // Store zip inside the job's extracted dir
@@ -62,84 +107,108 @@ export async function POST(req: Request) {
     console.log(`[Upload API] Zip file saved to: ${tempZipPath}`); // Added logging
 
     // Extract the zip file
-    await fs.createReadStream(tempZipPath)
+    await fs
+      .createReadStream(tempZipPath)
       .pipe(unzipper.Extract({ path: extractedDirPath }))
       .promise();
     console.log(`[Upload API] Zip file extracted to: ${extractedDirPath}`); // Added logging
 
     // Get all files from the extracted directory
     const allFilePaths = await getFilesInDir(extractedDirPath);
-    console.log(`[Upload API] All files found in extracted dir (${allFilePaths.length}):`, allFilePaths); // Added logging
+    console.log(
+      `[Upload API] All files found in extracted dir (${allFilePaths.length}):`,
+      allFilePaths
+    ); // Added logging
 
     // Filter out the original zip file from the list of files to scan
-    const filesToScan = allFilePaths.filter(p => p !== tempZipPath);
-    console.log(`[Upload API] Files to scan after filtering zip (${filesToScan.length}):`, filesToScan); // Added logging
+    const filesToScan = allFilePaths.filter((p) => p !== tempZipPath);
+    console.log(
+      `[Upload API] Files to scan after filtering zip (${filesToScan.length}):`,
+      filesToScan
+    ); // Added logging
 
     // Enforce the 100-file limit
     if (filesToScan.length > 100) {
       // Clean up immediately if limit exceeded
       await cleanupTempDir(extractedDirPath);
-      return new NextResponse(JSON.stringify({
-        message: 'File limit exceeded. Please upgrade to clean more than 100 files.',
-        redirect: '/pricing',
-      }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+      return new NextResponse(
+        JSON.stringify({
+          message:
+            "File limit exceeded. Please upgrade to clean more than 100 files.",
+          redirect: "/pricing",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
     }
 
-    const filesWithRelativePaths = await Promise.all(filesToScan.map(async (fullPath) => {
-      const stats = await fsp.stat(fullPath);
-      return {
-        fullPath,
-        relativePath: path.relative(extractedDirPath!, fullPath),
-        size: stats.size,
-      };
-    }));
-    console.log(`[Upload API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`, filesWithRelativePaths); // Added logging
+    const filesWithRelativePaths = await Promise.all(
+      filesToScan.map(async (fullPath) => {
+        const stats = await fsp.stat(fullPath);
+        return {
+          fullPath,
+          relativePath: path.relative(extractedDirPath!, fullPath),
+          size: stats.size,
+        };
+      })
+    );
+    console.log(
+      `[Upload API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`,
+      filesWithRelativePaths
+    ); // Added logging
 
-    const backendDuplicateGroups: BackendDuplicateGroup[] = await scanFilesForDuplicates(filesWithRelativePaths);
-    console.log(`[Upload API] Duplicate groups found by backend (${backendDuplicateGroups.length}):`, backendDuplicateGroups); // Added logging
+    const { duplicateGroups: backendDuplicateGroups, allScannedFiles } =
+      await scanFilesForDuplicates(filesWithRelativePaths, {
+        mode: mode ?? undefined,
+        pHashThreshold,
+        ssimThreshold,
+      });
+    console.log(
+      `[Upload API] Duplicate groups found by backend (${backendDuplicateGroups.length}). Total scanned files: ${allScannedFiles.length}`
+    );
 
     // Format the duplicate groups for the frontend
     const frontendDuplicates: FrontendDuplicateFile[] = [];
-    const allScannedFilesForFrontend: ScannedFile[] = []; // To store all scanned files for frontend lookup
-
-    // Collect all scanned files first
-    for (const group of backendDuplicateGroups) {
-      allScannedFilesForFrontend.push(group.original);
-      group.duplicates.forEach(dup => allScannedFilesForFrontend.push(dup));
-    }
-    // Add any unique files that weren't part of a duplicate group
-    const uniqueFiles = filesWithRelativePaths.filter(f => !allScannedFilesForFrontend.some(s => s.fullPath === f.fullPath));
-    for (const file of uniqueFiles) {
-      // Re-hash to get the ScannedFile structure, or just create a minimal one
-      // For simplicity, we'll just add the ones that are part of a group or are originals.
-      // The frontend's `uploadedFiles` state will hold all initial files.
-    }
-
+    const allScannedFilesForFrontend: ScannedFile[] = allScannedFiles; // Return everything scanned for UI
 
     // Now, populate frontendDuplicates
     for (const group of backendDuplicateGroups) {
-      group.duplicates.forEach(dup => {
+      group.duplicates.forEach((dup) => {
         frontendDuplicates.push({
           id: dup.id,
           fileName: dup.fileName,
           relativePath: dup.relativePath,
           type: dup.type,
           originalFileId: group.original.id, // Link to the original file's ID
+          // Surface how it was detected so UI can label it
+          // (MD5 | pHash | SSIM)
+          // dup already carries detectionMethod from the scanner
+          ...(dup.detectionMethod
+            ? { detectionMethod: dup.detectionMethod }
+            : {}),
         });
       });
     }
 
     // Clean up the temporary zip file, but keep the extracted directory for cleanup process
     if (tempZipPath) {
-      await fsp.unlink(tempZipPath).catch(err => console.error("Failed to delete temp zip:", err));
+      await fsp
+        .unlink(tempZipPath)
+        .catch((err) => console.error("Failed to delete temp zip:", err));
     }
 
-    return NextResponse.json({ jobId, duplicateGroups: frontendDuplicates, allScannedFiles: allScannedFilesForFrontend });
+    return NextResponse.json({
+      jobId,
+      duplicateGroups: frontendDuplicates,
+      allScannedFiles: allScannedFilesForFrontend,
+    });
   } catch (error) {
-    console.error('Error processing upload:', error);
+    console.error("Error processing upload:", error);
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ message: "Internal Server Error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 }

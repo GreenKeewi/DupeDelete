@@ -1,5 +1,5 @@
-import type { NextConfig } from "next";
 import CopyWebpackPlugin from "copy-webpack-plugin";
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
@@ -13,7 +13,9 @@ const nextConfig: NextConfig = {
     }
 
     // Ensure the WebP WASM used by dependencies is available at runtime in the server build.
-    // The error path expects the file at .next/server/app/api/upload/webp.wasm
+    // Some libraries (e.g., image-hash via @cwasm/webp) resolve the wasm from a vendor chunk dir in dev:
+    //   .next/server/vendor-chunks/webp.wasm
+    // We copy to both vendor-chunks/ and the previous app/api/upload/ path to satisfy different loaders.
     if (isServer) {
       config.plugins = config.plugins || [];
       const webpWasmPath = (() => {
@@ -32,6 +34,11 @@ const nextConfig: NextConfig = {
               {
                 from: webpWasmPath,
                 to: "app/api/upload/webp.wasm",
+                noErrorOnMissing: true,
+              },
+              {
+                from: webpWasmPath,
+                to: "vendor-chunks/webp.wasm",
                 noErrorOnMissing: true,
               },
             ],

@@ -22,7 +22,7 @@ async function getRawBody(readable: ReadableStream<Uint8Array>): Promise<Buffer>
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-08-27.basil", // Updated API version
+  apiVersion: "2025-08-27.basil", // Updated API version to match type definitions
 });
 
 export async function POST(req: Request) {

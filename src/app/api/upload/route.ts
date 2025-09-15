@@ -6,6 +6,9 @@ import { NextResponse } from "next/server";
 import path from "path";
 import unzipper from "unzipper";
 
+// Increase the default maximum number of event listeners to prevent warnings
+require('events').EventEmitter.defaultMaxListeners = 30; // Increased from default 10
+
 // Declare module for unzipper is now in src/types/unzipper.d.ts
 
 // Set the maximum file size for uploads (e.g., 1GB)

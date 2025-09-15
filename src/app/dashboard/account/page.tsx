@@ -35,7 +35,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+}
+from "@/components/ui/alert-dialog";
 
 // Define Zod schema for profile form
 const ProfileFormSchema = z.object({
@@ -189,51 +190,27 @@ export default function AccountPage() {
     toast.loading("Deleting your account...", { id: "delete-account" });
 
     try {
-      // First, delete the profile entry (if it exists).
-      // This is important because auth.users.delete() might not cascade to profiles
-      // if the RLS policy prevents the auth.users trigger from running correctly,
-      // or if the profile table has additional constraints.
-      // However, with ON DELETE CASCADE on the foreign key, deleting auth.users should handle it.
-      // For robustness, we can try to delete from profiles first, though it might not be strictly necessary.
-      // The primary way to delete a user in Supabase is via `auth.admin.deleteUser()`,
-      // but that's a server-side operation. Client-side, `supabase.auth.signOut()` and then
-      // `supabase.auth.admin.deleteUser()` from a server action/edge function would be ideal.
-      // For a client-side initiated deletion, we'll rely on the `auth.users` table's
-      // `ON DELETE CASCADE` to clean up `profiles` and `subscriptions`.
-      // The user can delete their own account via `supabase.auth.api.deleteUser()` but this is deprecated.
-      // The recommended way is to use a Supabase Edge Function or a Server Action.
-      // For simplicity and to demonstrate a client-side flow, we'll simulate the deletion
-      // and rely on the `handle_new_user` trigger's inverse logic or manual cleanup.
-      // A more robust solution would involve a server action to call `supabaseAdmin.auth.admin.deleteUser(user.id)`.
+      const response = await fetch("/api/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
 
-      // For now, we'll just sign out and inform the user, as direct client-side user deletion
-      // is not straightforward and often requires admin privileges or a server-side function.
-      // If the user has an active subscription, they should cancel it first.
-      // The prompt already handles this.
-
-      // If no active subscription, proceed with a simulated deletion and sign out.
-      // In a real app, this would trigger a server action to delete the user.
-      // For this example, we'll just sign out and show a success message.
-
-      // Simulate deletion of profile (if not handled by cascade)
-      const { error: profileDeleteError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', user.id);
-
-      if (profileDeleteError && profileDeleteError.code !== 'PGRST116') { // PGRST116 means no rows found, which is fine
-        console.error("Error deleting profile:", profileDeleteError);
-        throw new Error("Failed to delete user profile.");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete account.");
       }
 
-      // Sign out the user
+      // If server-side deletion is successful, sign out the user client-side
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) {
-        console.error("Error signing out after account deletion attempt:", signOutError);
-        throw new Error("Failed to sign out after account deletion.");
+        console.error("Error signing out after account deletion:", signOutError);
+        throw new Error("Account deleted, but failed to sign out. Please clear your browser data.");
       }
 
-      toast.success("Your account has been deleted and you have been logged out.", { id: "delete-account" });
+      toast.success("Your account and all associated data have been deleted. You have been logged out.", { id: "delete-account" });
       router.push("/login"); // Redirect to login page
     } catch (error: any) {
       console.error("Error deleting account:", error);

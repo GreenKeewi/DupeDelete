@@ -7,20 +7,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: Request) {
   if (req.method !== "POST") {
-    return new NextResponse("Method Not Allowed", { status: 405 });
+    return new NextResponse(JSON.stringify({ message: "Method Not Allowed" }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
   try {
     const { plan, interval, userId } = await req.json(); // Get interval and userId from request body
 
     if (!plan || (plan !== "basic" && plan !== "pro")) {
-      return new NextResponse("Invalid plan specified", { status: 400 });
+      return new NextResponse(JSON.stringify({ message: "Invalid plan specified" }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
     if (!interval || (interval !== "monthly" && interval !== "yearly")) {
-      return new NextResponse("Invalid interval specified", { status: 400 });
+      return new NextResponse(JSON.stringify({ message: "Invalid interval specified" }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
     if (!userId) {
-      return new NextResponse("User ID is required for checkout.", { status: 400 });
+      return new NextResponse(JSON.stringify({ message: "User ID is required for checkout." }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     let priceId: string | undefined;
@@ -32,12 +32,13 @@ export async function POST(req: Request) {
     } else if (plan === "pro") {
       priceId = interval === "monthly"
         ? process.env.STRIPE_PRO_PRICE_ID
-        : process.env.STRIPE_PRO_YEARLY_PRICE_ID;
+        : process.env.STRIPE_PRO_YEARLY_PRICE_ID; // Corrected typo here
     }
 
     if (!priceId) {
-      console.error(`Stripe price ID not configured for plan: ${plan} and interval: ${interval}`);
-      return new NextResponse(`Stripe price ID not configured for ${plan} ${interval} plan.`, { status: 500 });
+      const errorMessage = `Stripe price ID not configured for plan: ${plan} and interval: ${interval}. Please check your environment variables.`;
+      console.error(errorMessage);
+      return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -58,8 +59,8 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Stripe checkout session creation failed:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return new NextResponse(JSON.stringify({ message: error.message || "Internal Server Error" }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

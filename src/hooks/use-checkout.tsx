@@ -38,7 +38,15 @@ export const useCheckout = ({ user, onLoadingChange }: UseCheckoutOptions) => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create checkout session.");
+        let errorMessage = "Failed to create checkout session.";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // If response is not JSON, use a generic message
+          console.error("Failed to parse error response from /api/checkout:", parseError);
+        }
+        throw new Error(errorMessage);
       }
 
       const { url } = await response.json();
@@ -47,9 +55,9 @@ export const useCheckout = ({ user, onLoadingChange }: UseCheckoutOptions) => {
       } else {
         throw new Error("No checkout URL received.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Stripe checkout error:", error);
-      toast.error("Failed to start checkout. Please try again.", { id: "checkout" });
+      toast.error(error.message || "Failed to start checkout. Please try again.", { id: "checkout" });
       setIsCheckoutLoading(false);
       onLoadingChange?.(false);
     }

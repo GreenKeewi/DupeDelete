@@ -6,8 +6,8 @@ import { NextResponse } from "next/server";
 import path from "path";
 import unzipper from "unzipper";
 
-// Increase the default maximum number of event listeners to prevent warnings
-require('events').EventEmitter.defaultMaxListeners = 30; // Increased from default 10
+// Removed: require('events').EventEmitter.defaultMaxListeners = 30;
+// This global override is removed to encourage proper stream management.
 
 // Declare module for unzipper is now in src/types/unzipper.d.ts
 
@@ -89,46 +89,56 @@ export async function POST(req: Request) {
     }
 
     // Create a temporary directory for this job
-    // Create a stable jobId and extracted dir under OS temp base
     const baseTemp = await createTempDir("job-");
     jobId = path.basename(baseTemp);
-    // We want a sibling dir with suffix -extracted-
     extractedDirPath = path.join(path.dirname(baseTemp), jobId + "-extracted-");
     await fsp.mkdir(extractedDirPath, { recursive: true });
     // Remove the unused baseTemp dir to avoid leaks
     try {
       await fsp.rm(baseTemp, { recursive: true, force: true });
-    } catch {}
+    } catch (err) {
+      console.warn(`Failed to remove base temp dir ${baseTemp}:`, err);
+    }
     console.log(
       `[Upload API] Job ID: ${jobId}, Extracted Dir: ${extractedDirPath}`
-    ); // Added logging
+    );
 
     // Save the uploaded zip file temporarily
-    tempZipPath = path.join(extractedDirPath, file.name); // Store zip inside the job's extracted dir
+    tempZipPath = path.join(extractedDirPath, file.name);
     const buffer = Buffer.from(await file.arrayBuffer());
     await fsp.writeFile(tempZipPath, buffer);
-    console.log(`[Upload API] Zip file saved to: ${tempZipPath}`); // Added logging
+    console.log(`[Upload API] Zip file saved to: ${tempZipPath}`);
 
-    // Extract the zip file
-    await fs
-      .createReadStream(tempZipPath)
-      .pipe(unzipper.Extract({ path: extractedDirPath }))
-      .promise();
-    console.log(`[Upload API] Zip file extracted to: ${extractedDirPath}`); // Added logging
+    // Extract the zip file with explicit error and close handling
+    const zipStream = fs.createReadStream(tempZipPath);
+    const unzipExtractor = unzipper.Extract({ path: extractedDirPath });
+
+    await new Promise<void>((resolve, reject) => {
+      zipStream.pipe(unzipExtractor)
+        .on('error', (err: Error) => { // Fixed: Explicitly type 'err' as Error
+          console.error(`[Upload API] Error during unzipping: ${err.message}`);
+          reject(err);
+        })
+        .on('close', () => {
+          console.log(`[Upload API] Unzipping completed for ${tempZipPath}`);
+          resolve();
+        });
+    });
+    console.log(`[Upload API] Zip file extracted to: ${extractedDirPath}`);
 
     // Get all files from the extracted directory
     const allFilePaths = await getFilesInDir(extractedDirPath);
     console.log(
       `[Upload API] All files found in extracted dir (${allFilePaths.length}):`,
       allFilePaths
-    ); // Added logging
+    );
 
     // Filter out the original zip file from the list of files to scan
     const filesToScan = allFilePaths.filter((p) => p !== tempZipPath);
     console.log(
       `[Upload API] Files to scan after filtering zip (${filesToScan.length}):`,
       filesToScan
-    ); // Added logging
+    );
 
     // Enforce the 100-file limit
     if (filesToScan.length > 100) {
@@ -157,7 +167,7 @@ export async function POST(req: Request) {
     console.log(
       `[Upload API] Files with relative paths for scanning (${filesWithRelativePaths.length}):`,
       filesWithRelativePaths
-    ); // Added logging
+    );
 
     const { duplicateGroups: backendDuplicateGroups, allScannedFiles } =
       await scanFilesForDuplicates(filesWithRelativePaths, {
@@ -171,9 +181,8 @@ export async function POST(req: Request) {
 
     // Format the duplicate groups for the frontend
     const frontendDuplicates: FrontendDuplicateFile[] = [];
-    const allScannedFilesForFrontend: ScannedFile[] = allScannedFiles; // Return everything scanned for UI
+    const allScannedFilesForFrontend: ScannedFile[] = allScannedFiles;
 
-    // Now, populate frontendDuplicates
     for (const group of backendDuplicateGroups) {
       group.duplicates.forEach((dup) => {
         frontendDuplicates.push({
@@ -181,10 +190,7 @@ export async function POST(req: Request) {
           fileName: dup.fileName,
           relativePath: dup.relativePath,
           type: dup.type,
-          originalFileId: group.original.id, // Link to the original file's ID
-          // Surface how it was detected so UI can label it
-          // (MD5 | pHash | SSIM)
-          // dup already carries detectionMethod from the scanner
+          originalFileId: group.original.id,
           ...(dup.detectionMethod
             ? { detectionMethod: dup.detectionMethod }
             : {}),
@@ -192,26 +198,39 @@ export async function POST(req: Request) {
       });
     }
 
-    // Clean up the temporary zip file, but keep the extracted directory for cleanup process
-    if (tempZipPath) {
-      await fsp
-        .unlink(tempZipPath)
-        .catch((err) => console.error("Failed to delete temp zip:", err));
-    }
-
     return NextResponse.json({
       jobId,
       duplicateGroups: frontendDuplicates,
       allScannedFiles: allScannedFilesForFrontend,
     });
-  } catch (error) {
+  } catch (error: unknown) { // Fixed: Explicitly type 'error' as unknown
     console.error("Error processing upload:", error);
     if (extractedDirPath) {
       await cleanupTempDir(extractedDirPath);
     }
+    // Fixed: Use a type guard to safely access error.message
+    const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
     return new NextResponse(
-      JSON.stringify({ message: "Internal Server Error" }),
+      JSON.stringify({ message: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
+  } finally {
+    // Clean up the temporary zip file and extracted directory in the finally block
+    if (tempZipPath) {
+      await fsp
+        .unlink(tempZipPath)
+        .catch((err) => console.warn("Failed to delete temp zip:", err));
+    }
+    if (extractedDirPath) {
+      // Only clean up the extracted directory if no jobId was successfully created,
+      // or if an error occurred before the cleanup process could start.
+      // The /api/download route is responsible for cleaning up the extractedDirPath
+      // after the user downloads the cleaned folder.
+      // If an error occurs *before* a successful response, we should clean up.
+      // If the process completes successfully, the extractedDirPath is kept for download.
+      // This logic needs to be careful not to delete files needed for download.
+      // For now, I'll keep the existing cleanup in /api/download and only add tempZipPath cleanup here.
+      // If the error happens *after* jobId is set and before response, the download cleanup will handle it.
+    }
   }
 }

@@ -32,11 +32,18 @@ export async function POST(req: Request) {
     } else if (plan === "pro") {
       priceId = interval === "monthly"
         ? process.env.STRIPE_PRO_PRICE_ID
-        : process.env.STRIPE_PRO_YEARLY_PRICE_ID; // Corrected typo here
+        : process.env.STRIPE_PRO_YEARLY_PRICE_ID;
     }
 
     if (!priceId) {
       const errorMessage = `Stripe price ID not configured for plan: ${plan} and interval: ${interval}. Please check your environment variables.`;
+      console.error(errorMessage);
+      return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    if (!baseUrl || (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://'))) {
+      const errorMessage = "NEXT_PUBLIC_BASE_URL environment variable is not set or is invalid. It must include an explicit scheme (e.g., 'https://yourdomain.com').";
       console.error(errorMessage);
       return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
@@ -50,8 +57,8 @@ export async function POST(req: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
+      success_url: `${baseUrl}/success`,
+      cancel_url: `${baseUrl}/pricing`,
       metadata: {
         user_id: userId, // Pass the user ID to the Stripe session metadata
       },

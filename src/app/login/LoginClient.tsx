@@ -69,7 +69,7 @@ export default function LoginClient() {
         )}
         <Auth
           supabaseClient={supabase}
-          providers={[]}
+          providers={["google"]}
           appearance={{
             theme: ThemeSupa,
             variables: {
